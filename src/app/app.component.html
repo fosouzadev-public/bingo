@@ -1,0 +1,19 @@
+<h2>Bingo</h2>
+<div id="balls">
+  @for (ball of this.shuffledBalls; track ball.number) {
+  <span class="ball" [ngClass]="ball.alreadyDrawn ? 'already-drawn' : 'not-drawn'">
+    {{ ball.number }}
+  </span>
+  }
+</div>
+<div id="drawing">
+  <div>
+    <p><button (click)="drawBall()">Sortear</button></p>
+    <p><button (click)="start()">Reiniciar</button></p>
+  </div>
+  <div>
+    <span class="ball drawn-now">
+      {{ this.currentBall.number }}
+    </span>
+  </div>
+</div>
