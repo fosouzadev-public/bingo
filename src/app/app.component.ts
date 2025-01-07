@@ -27,7 +27,16 @@ export class AppComponent {
   currentBall!: Ball;
 
   constructor() {
-    this.start();
+    const savedShuffledBalls = localStorage.getItem('savedShuffledBalls');
+    const savedCurrentIndex = localStorage.getItem('savedCurrentIndex');
+
+    if (savedShuffledBalls && savedCurrentIndex) {
+      this.shuffledBalls = JSON.parse(savedShuffledBalls);
+      this.currentIndex = Number(savedCurrentIndex);
+      this.currentBall = this.shuffledBalls[this.currentIndex];
+    } else {
+      this.start();
+    }
   }
 
   private generateBalls() {
@@ -49,10 +58,14 @@ export class AppComponent {
     if (this.currentIndex < this.shuffledBalls.length) {
       this.currentBall = this.shuffledBalls[this.currentIndex];
       this.currentBall.alreadyDrawn = true;
+
+      localStorage.setItem('savedShuffledBalls', JSON.stringify(this.shuffledBalls));
+      localStorage.setItem('savedCurrentIndex', this.currentIndex.toString());
     }
   }
 
   start() {
+    localStorage.clear();
     this.currentIndex = -1;
     this.currentBall = new Ball("00");
 
