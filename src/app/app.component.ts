@@ -27,15 +27,29 @@ export class AppComponent {
   currentBall!: Ball;
 
   constructor() {
-    const savedShuffledBalls = localStorage.getItem('savedShuffledBalls');
-    const savedCurrentIndex = localStorage.getItem('savedCurrentIndex');
-
-    if (savedShuffledBalls && savedCurrentIndex) {
-      this.shuffledBalls = JSON.parse(savedShuffledBalls);
-      this.currentIndex = Number(savedCurrentIndex);
-      this.currentBall = this.shuffledBalls[this.currentIndex];
-    } else {
+    if (this.loadFromLocalStorage() == false) {
       this.start();
+    }
+  }
+
+  start() {
+    localStorage.clear();
+    this.currentIndex = -1;
+    this.currentBall = new Ball('');
+
+    this.generateBalls();
+    this.shuffleBalls();
+  }
+
+  drawBall() {
+    ++this.currentIndex;
+
+    if (this.currentIndex < this.shuffledBalls.length) {
+      this.currentBall = this.shuffledBalls[this.currentIndex];
+      this.currentBall.alreadyDrawn = true;
+
+      localStorage.setItem('savedShuffledBalls', JSON.stringify(this.shuffledBalls));
+      localStorage.setItem('savedCurrentIndex', this.currentIndex.toString());
     }
   }
 
@@ -52,24 +66,17 @@ export class AppComponent {
     }
   }
 
-  drawBall() {
-    ++this.currentIndex;
+  private loadFromLocalStorage() : boolean {
+    const savedShuffledBalls = localStorage.getItem('savedShuffledBalls');
+    const savedCurrentIndex = localStorage.getItem('savedCurrentIndex');
 
-    if (this.currentIndex < this.shuffledBalls.length) {
+    if (savedShuffledBalls && savedCurrentIndex) {
+      this.shuffledBalls = JSON.parse(savedShuffledBalls);
+      this.currentIndex = Number(savedCurrentIndex);
       this.currentBall = this.shuffledBalls[this.currentIndex];
-      this.currentBall.alreadyDrawn = true;
-
-      localStorage.setItem('savedShuffledBalls', JSON.stringify(this.shuffledBalls));
-      localStorage.setItem('savedCurrentIndex', this.currentIndex.toString());
+      return true;
     }
-  }
 
-  start() {
-    localStorage.clear();
-    this.currentIndex = -1;
-    this.currentBall = new Ball("00");
-
-    this.generateBalls();
-    this.shuffleBalls();
+    return false;
   }
 }

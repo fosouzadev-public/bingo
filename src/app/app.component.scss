@@ -6,20 +6,20 @@ h1 {
     padding-bottom: 5px;
 }
 
-#balls {
+.panel {
     display: flex;
     flex-direction: row;
     flex-wrap: wrap;
-    justify-content: center;
     border: 1px solid white;
     border-radius: 20px 20px 20px 20px;
-    background-color: silver;
+    background-color: rgb(231, 230, 230);
+}
+
+#balls {
+    justify-content: center;
 }
 
 #drawing {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
     justify-content: space-around;
     align-items: center;
     margin-top: 30px;
@@ -27,31 +27,25 @@ h1 {
 }
 
 .ball {
-    border: solid black 2px;
-    margin: 10px;
+    width: 60px;
+    height: 60px;
     border-radius: 50%;
+    text-align: center;
+    font-size: 35px;
     font-weight: bold;
-    box-shadow: 1px 3px 3px rgba(0, 0, 0, 0.3);
-    //transition: background-color 0.8s ease-in-out;
-    transition: all 0.8s ease-in-out;
-}
-
-.already-drawn {
-    padding: 7px 7px;
-    background-color: white;
-    font-size: 35px;
-}
-
-.not-drawn {
-    padding: 7px 7px;
-    background-color: black;
-    font-size: 35px;
+    margin: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle at 50% 50%, #fff, #888);
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .drawn-now {
-    padding: 32px 35px;
-    background-color: white;
-    font-size: 200px;
+    width: 350px;
+    height: 350px;
+    font-size: 220px;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
 }
 
 button {
@@ -60,4 +54,5 @@ button {
     border: solid 1px black;
     border-radius: 10px 10px 10px 10px;
     width: 250px;
+    box-shadow: 1px 3px 3px rgba(0, 0, 0, 0.3);
 }
