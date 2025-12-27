@@ -1,15 +1,6 @@
 import { Component, computed, OnInit, Signal, signal, WritableSignal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
-export class Ball {
-  number: string;
-  alreadyDrawn: boolean;
-
-  constructor(number: string, alreadyDrawn: boolean = false) {
-    this.number = number;
-    this.alreadyDrawn = alreadyDrawn;
-  }
-}
+import { Ball } from './models/ball.model';
 
 @Component({
   selector: 'app-root',
@@ -21,13 +12,20 @@ export class Ball {
 })
 export class AppComponent implements OnInit {
   private _maxBalls = 80;
-  private currentIndex!: number;
 
-  protected shuffledBalls: WritableSignal<Ball[]> = signal([]);
-  protected currentBall: WritableSignal<Ball> = signal(new Ball(''));
+  private currentIndex: WritableSignal<number> = signal(-1);
+  private shuffledBalls: WritableSignal<Ball[]> = signal([]);
 
   protected balls: Signal<Ball[]> = computed(() =>
     [...this.shuffledBalls()].sort((a, b) => +a.number - +b.number));
+
+  protected currentBall: Signal<Ball> = computed(() => {
+    if (this.currentIndex() < 0) {
+      return new Ball('');
+    }
+
+    return this.shuffledBalls()[this.currentIndex()];
+  });
 
   ngOnInit() {
     if (this.loadFromLocalStorage() == false) {
@@ -37,10 +35,7 @@ export class AppComponent implements OnInit {
 
   start() {
     localStorage.clear();
-
-    this.currentIndex = -1;
-    this.currentBall.set(new Ball(''));
-
+    this.currentIndex.set(-1);
     this.generateAndShuffleBalls();
   }
 
@@ -67,18 +62,17 @@ export class AppComponent implements OnInit {
   }
 
   drawBall() {
-    ++this.currentIndex;
+    const newIndex = this.currentIndex() + 1;
 
-    if (this.currentIndex < this._maxBalls) {
-      const ballToDraw = this.shuffledBalls()[this.currentIndex];
+    if (newIndex >= 0 && newIndex < this._maxBalls) {
+      const ballToDraw = this.shuffledBalls()[newIndex];
       ballToDraw.alreadyDrawn = true;
 
-      this.currentBall.set(ballToDraw);
-      // Notify signal that the array content has mutated (crucial for OnPush / efficient change detection)
       this.shuffledBalls.update(current => [...current]);
+      this.currentIndex.set(newIndex);
 
       localStorage.setItem('savedShuffledBalls', JSON.stringify(this.shuffledBalls()));
-      localStorage.setItem('savedCurrentIndex', this.currentIndex.toString());
+      localStorage.setItem('savedCurrentIndex', this.currentIndex().toString());
     }
   }
 
@@ -90,9 +84,7 @@ export class AppComponent implements OnInit {
       const parsedShuffledBalls: Ball[] = JSON.parse(savedShuffledBalls);
 
       this.shuffledBalls.set(parsedShuffledBalls);
-
-      this.currentIndex = Number(savedCurrentIndex);
-      this.currentBall.set(this.shuffledBalls()[this.currentIndex]);
+      this.currentIndex.set(Number(savedCurrentIndex));
 
       return true;
     }
