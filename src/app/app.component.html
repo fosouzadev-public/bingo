@@ -1,6 +1,6 @@
 <h1>Bingo</h1>
 <div id="balls" class="panel">
-  @for (ball of this.shuffledBalls; track ball.number) {
+  @for (ball of this.balls(); track ball.number) {
   <span class="ball">
     @if (ball.alreadyDrawn) {
     {{ ball.number }}
@@ -11,11 +11,13 @@
 <div id="drawing" class="panel">
   <div>
     <p><button (click)="drawBall()">Sortear</button></p>
-    <p><button (click)="start()">Reiniciar</button></p>
   </div>
   <div>
     <span class="ball drawn-now">
-      {{ this.currentBall.number }}
+      {{ this.currentBall().number }}
     </span>
+  </div>
+  <div>
+    <p><button (click)="start()">Reiniciar</button></p>
   </div>
 </div>

@@ -3,11 +3,14 @@ import {
   Attribute,
   ChangeDetectorRef,
   DEFAULT_CURRENCY_CODE,
+  DOCUMENT,
+  DestroyRef,
   Directive,
   ElementRef,
   Host,
   IMAGE_CONFIG,
   IMAGE_CONFIG_DEFAULTS,
+  INTERNAL_APPLICATION_ERROR_HANDLER,
   Inject,
   Injectable,
   InjectionToken,
@@ -21,7 +24,6 @@ import {
   NgModuleRef$1,
   NgZone,
   Optional,
-  PLATFORM_ID,
   Pipe,
   Renderer2,
   RendererStyleFlags2,
@@ -49,7 +51,6 @@ import {
   stringify,
   untracked,
   unwrapSafeValue,
-  ɵɵInputTransformsFeature,
   ɵɵNgOnChangesFeature,
   ɵɵdefineDirective,
   ɵɵdefineInjectable,
@@ -60,9 +61,9 @@ import {
   ɵɵinject,
   ɵɵinjectAttribute,
   ɵɵstyleProp
-} from "./chunk-GZKEX4RU.js";
+} from "./chunk-BZSXGGOF.js";
 
-// node_modules/@angular/common/fesm2022/common.mjs
+// node_modules/@angular/common/fesm2022/_platform_location-chunk.mjs
 var _DOM = null;
 function getDOM() {
   return _DOM;
@@ -72,26 +73,6 @@ function setRootDomAdapter(adapter) {
 }
 var DomAdapter = class {
 };
-var PlatformNavigation = class _PlatformNavigation {
-  static ɵfac = function PlatformNavigation_Factory(__ngFactoryType__) {
-    return new (__ngFactoryType__ || _PlatformNavigation)();
-  };
-  static ɵprov = ɵɵdefineInjectable({
-    token: _PlatformNavigation,
-    factory: () => (() => window.navigation)(),
-    providedIn: "platform"
-  });
-};
-(() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(PlatformNavigation, [{
-    type: Injectable,
-    args: [{
-      providedIn: "platform",
-      useFactory: () => window.navigation
-    }]
-  }], null, null);
-})();
-var DOCUMENT = new InjectionToken(ngDevMode ? "DocumentToken" : "");
 var PlatformLocation = class _PlatformLocation {
   historyGo(relativePosition) {
     throw new Error(ngDevMode ? "Not implemented" : "");
@@ -114,7 +95,7 @@ var PlatformLocation = class _PlatformLocation {
     }]
   }], null, null);
 })();
-var LOCATION_INITIALIZED = new InjectionToken(ngDevMode ? "Location Initialized" : "");
+var LOCATION_INITIALIZED = new InjectionToken(typeof ngDevMode !== "undefined" && ngDevMode ? "Location Initialized" : "");
 var BrowserPlatformLocation = class _BrowserPlatformLocation extends PlatformLocation {
   _location;
   _history;
@@ -197,36 +178,22 @@ var BrowserPlatformLocation = class _BrowserPlatformLocation extends PlatformLoc
     }]
   }], () => [], null);
 })();
+
+// node_modules/@angular/common/fesm2022/_location-chunk.mjs
 function joinWithSlash(start, end) {
-  if (start.length == 0) {
-    return end;
-  }
-  if (end.length == 0) {
-    return start;
-  }
-  let slashes = 0;
+  if (!start) return end;
+  if (!end) return start;
   if (start.endsWith("/")) {
-    slashes++;
+    return end.startsWith("/") ? start + end.slice(1) : start + end;
   }
-  if (end.startsWith("/")) {
-    slashes++;
-  }
-  if (slashes == 2) {
-    return start + end.substring(1);
-  }
-  if (slashes == 1) {
-    return start + end;
-  }
-  return start + "/" + end;
+  return end.startsWith("/") ? start + end : `${start}/${end}`;
 }
 function stripTrailingSlash(url) {
-  const match = url.match(/#|\?|$/);
-  const pathEndIdx = match && match.index || url.length;
-  const droppedSlashIdx = pathEndIdx - (url[pathEndIdx - 1] === "/" ? 1 : 0);
-  return url.slice(0, droppedSlashIdx) + url.slice(pathEndIdx);
+  const pathEndIdx = url.search(/#|\?|$/);
+  return url[pathEndIdx - 1] === "/" ? url.slice(0, pathEndIdx - 1) + url.slice(pathEndIdx) : url;
 }
 function normalizeQueryParams(params) {
-  return params && params[0] !== "?" ? "?" + params : params;
+  return params && params[0] !== "?" ? `?${params}` : params;
 }
 var LocationStrategy = class _LocationStrategy {
   historyGo(relativePosition) {
@@ -250,7 +217,7 @@ var LocationStrategy = class _LocationStrategy {
     }]
   }], null, null);
 })();
-var APP_BASE_HREF = new InjectionToken(ngDevMode ? "appBaseHref" : "");
+var APP_BASE_HREF = new InjectionToken(typeof ngDevMode !== "undefined" && ngDevMode ? "appBaseHref" : "");
 var PathLocationStrategy = class _PathLocationStrategy extends LocationStrategy {
   _platformLocation;
   _baseHref;
@@ -260,7 +227,6 @@ var PathLocationStrategy = class _PathLocationStrategy extends LocationStrategy 
     this._platformLocation = _platformLocation;
     this._baseHref = href ?? this._platformLocation.getBaseHrefFromDOM() ?? inject(DOCUMENT).location?.origin ?? "";
   }
-  /** @nodoc */
   ngOnDestroy() {
     while (this._removeListenerFns.length) {
       this._removeListenerFns.pop()();
@@ -327,6 +293,137 @@ var PathLocationStrategy = class _PathLocationStrategy extends LocationStrategy 
     }]
   }], null);
 })();
+var Location = class _Location {
+  _subject = new Subject();
+  _basePath;
+  _locationStrategy;
+  _urlChangeListeners = [];
+  _urlChangeSubscription = null;
+  constructor(locationStrategy) {
+    this._locationStrategy = locationStrategy;
+    const baseHref = this._locationStrategy.getBaseHref();
+    this._basePath = _stripOrigin(stripTrailingSlash(_stripIndexHtml(baseHref)));
+    this._locationStrategy.onPopState((ev) => {
+      this._subject.next({
+        "url": this.path(true),
+        "pop": true,
+        "state": ev.state,
+        "type": ev.type
+      });
+    });
+  }
+  ngOnDestroy() {
+    this._urlChangeSubscription?.unsubscribe();
+    this._urlChangeListeners = [];
+  }
+  path(includeHash = false) {
+    return this.normalize(this._locationStrategy.path(includeHash));
+  }
+  getState() {
+    return this._locationStrategy.getState();
+  }
+  isCurrentPathEqualTo(path, query = "") {
+    return this.path() == this.normalize(path + normalizeQueryParams(query));
+  }
+  normalize(url) {
+    return _Location.stripTrailingSlash(_stripBasePath(this._basePath, _stripIndexHtml(url)));
+  }
+  prepareExternalUrl(url) {
+    if (url && url[0] !== "/") {
+      url = "/" + url;
+    }
+    return this._locationStrategy.prepareExternalUrl(url);
+  }
+  go(path, query = "", state = null) {
+    this._locationStrategy.pushState(state, "", path, query);
+    this._notifyUrlChangeListeners(this.prepareExternalUrl(path + normalizeQueryParams(query)), state);
+  }
+  replaceState(path, query = "", state = null) {
+    this._locationStrategy.replaceState(state, "", path, query);
+    this._notifyUrlChangeListeners(this.prepareExternalUrl(path + normalizeQueryParams(query)), state);
+  }
+  forward() {
+    this._locationStrategy.forward();
+  }
+  back() {
+    this._locationStrategy.back();
+  }
+  historyGo(relativePosition = 0) {
+    this._locationStrategy.historyGo?.(relativePosition);
+  }
+  onUrlChange(fn) {
+    this._urlChangeListeners.push(fn);
+    this._urlChangeSubscription ??= this.subscribe((v) => {
+      this._notifyUrlChangeListeners(v.url, v.state);
+    });
+    return () => {
+      const fnIndex = this._urlChangeListeners.indexOf(fn);
+      this._urlChangeListeners.splice(fnIndex, 1);
+      if (this._urlChangeListeners.length === 0) {
+        this._urlChangeSubscription?.unsubscribe();
+        this._urlChangeSubscription = null;
+      }
+    };
+  }
+  _notifyUrlChangeListeners(url = "", state) {
+    this._urlChangeListeners.forEach((fn) => fn(url, state));
+  }
+  subscribe(onNext, onThrow, onReturn) {
+    return this._subject.subscribe({
+      next: onNext,
+      error: onThrow ?? void 0,
+      complete: onReturn ?? void 0
+    });
+  }
+  static normalizeQueryParams = normalizeQueryParams;
+  static joinWithSlash = joinWithSlash;
+  static stripTrailingSlash = stripTrailingSlash;
+  static ɵfac = function Location_Factory(__ngFactoryType__) {
+    return new (__ngFactoryType__ || _Location)(ɵɵinject(LocationStrategy));
+  };
+  static ɵprov = ɵɵdefineInjectable({
+    token: _Location,
+    factory: () => createLocation(),
+    providedIn: "root"
+  });
+};
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(Location, [{
+    type: Injectable,
+    args: [{
+      providedIn: "root",
+      useFactory: createLocation
+    }]
+  }], () => [{
+    type: LocationStrategy
+  }], null);
+})();
+function createLocation() {
+  return new Location(ɵɵinject(LocationStrategy));
+}
+function _stripBasePath(basePath, url) {
+  if (!basePath || !url.startsWith(basePath)) {
+    return url;
+  }
+  const strippedUrl = url.substring(basePath.length);
+  if (strippedUrl === "" || ["/", ";", "?", "#"].includes(strippedUrl[0])) {
+    return strippedUrl;
+  }
+  return url;
+}
+function _stripIndexHtml(url) {
+  return url.replace(/\/index.html$/, "");
+}
+function _stripOrigin(baseHref) {
+  const isAbsoluteUrl2 = new RegExp("^(https?:)?//").test(baseHref);
+  if (isAbsoluteUrl2) {
+    const [, pathname] = baseHref.split(/\/\/[^\/]+/);
+    return pathname;
+  }
+  return baseHref;
+}
+
+// node_modules/@angular/common/fesm2022/_common_module-chunk.mjs
 var HashLocationStrategy = class _HashLocationStrategy extends LocationStrategy {
   _platformLocation;
   _baseHref = "";
@@ -338,7 +435,6 @@ var HashLocationStrategy = class _HashLocationStrategy extends LocationStrategy 
       this._baseHref = _baseHref;
     }
   }
-  /** @nodoc */
   ngOnDestroy() {
     while (this._removeListenerFns.length) {
       this._removeListenerFns.pop()();
@@ -359,17 +455,11 @@ var HashLocationStrategy = class _HashLocationStrategy extends LocationStrategy 
     return url.length > 0 ? "#" + url : url;
   }
   pushState(state, title, path, queryParams) {
-    let url = this.prepareExternalUrl(path + normalizeQueryParams(queryParams));
-    if (url.length == 0) {
-      url = this._platformLocation.pathname;
-    }
+    const url = this.prepareExternalUrl(path + normalizeQueryParams(queryParams)) || this._platformLocation.pathname;
     this._platformLocation.pushState(state, title, url);
   }
   replaceState(state, title, path, queryParams) {
-    let url = this.prepareExternalUrl(path + normalizeQueryParams(queryParams));
-    if (url.length == 0) {
-      url = this._platformLocation.pathname;
-    }
+    const url = this.prepareExternalUrl(path + normalizeQueryParams(queryParams)) || this._platformLocation.pathname;
     this._platformLocation.replaceState(state, title, url);
   }
   forward() {
@@ -407,263 +497,6 @@ var HashLocationStrategy = class _HashLocationStrategy extends LocationStrategy 
     }]
   }], null);
 })();
-var Location = class _Location {
-  /** @internal */
-  _subject = new Subject();
-  /** @internal */
-  _basePath;
-  /** @internal */
-  _locationStrategy;
-  /** @internal */
-  _urlChangeListeners = [];
-  /** @internal */
-  _urlChangeSubscription = null;
-  constructor(locationStrategy) {
-    this._locationStrategy = locationStrategy;
-    const baseHref = this._locationStrategy.getBaseHref();
-    this._basePath = _stripOrigin(stripTrailingSlash(_stripIndexHtml(baseHref)));
-    this._locationStrategy.onPopState((ev) => {
-      this._subject.next({
-        "url": this.path(true),
-        "pop": true,
-        "state": ev.state,
-        "type": ev.type
-      });
-    });
-  }
-  /** @nodoc */
-  ngOnDestroy() {
-    this._urlChangeSubscription?.unsubscribe();
-    this._urlChangeListeners = [];
-  }
-  /**
-   * Normalizes the URL path for this location.
-   *
-   * @param includeHash True to include an anchor fragment in the path.
-   *
-   * @returns The normalized URL path.
-   */
-  // TODO: vsavkin. Remove the boolean flag and always include hash once the deprecated router is
-  // removed.
-  path(includeHash = false) {
-    return this.normalize(this._locationStrategy.path(includeHash));
-  }
-  /**
-   * Reports the current state of the location history.
-   * @returns The current value of the `history.state` object.
-   */
-  getState() {
-    return this._locationStrategy.getState();
-  }
-  /**
-   * Normalizes the given path and compares to the current normalized path.
-   *
-   * @param path The given URL path.
-   * @param query Query parameters.
-   *
-   * @returns True if the given URL path is equal to the current normalized path, false
-   * otherwise.
-   */
-  isCurrentPathEqualTo(path, query = "") {
-    return this.path() == this.normalize(path + normalizeQueryParams(query));
-  }
-  /**
-   * Normalizes a URL path by stripping any trailing slashes.
-   *
-   * @param url String representing a URL.
-   *
-   * @returns The normalized URL string.
-   */
-  normalize(url) {
-    return _Location.stripTrailingSlash(_stripBasePath(this._basePath, _stripIndexHtml(url)));
-  }
-  /**
-   * Normalizes an external URL path.
-   * If the given URL doesn't begin with a leading slash (`'/'`), adds one
-   * before normalizing. Adds a hash if `HashLocationStrategy` is
-   * in use, or the `APP_BASE_HREF` if the `PathLocationStrategy` is in use.
-   *
-   * @param url String representing a URL.
-   *
-   * @returns  A normalized platform-specific URL.
-   */
-  prepareExternalUrl(url) {
-    if (url && url[0] !== "/") {
-      url = "/" + url;
-    }
-    return this._locationStrategy.prepareExternalUrl(url);
-  }
-  // TODO: rename this method to pushState
-  /**
-   * Changes the browser's URL to a normalized version of a given URL, and pushes a
-   * new item onto the platform's history.
-   *
-   * @param path  URL path to normalize.
-   * @param query Query parameters.
-   * @param state Location history state.
-   *
-   */
-  go(path, query = "", state = null) {
-    this._locationStrategy.pushState(state, "", path, query);
-    this._notifyUrlChangeListeners(this.prepareExternalUrl(path + normalizeQueryParams(query)), state);
-  }
-  /**
-   * Changes the browser's URL to a normalized version of the given URL, and replaces
-   * the top item on the platform's history stack.
-   *
-   * @param path  URL path to normalize.
-   * @param query Query parameters.
-   * @param state Location history state.
-   */
-  replaceState(path, query = "", state = null) {
-    this._locationStrategy.replaceState(state, "", path, query);
-    this._notifyUrlChangeListeners(this.prepareExternalUrl(path + normalizeQueryParams(query)), state);
-  }
-  /**
-   * Navigates forward in the platform's history.
-   */
-  forward() {
-    this._locationStrategy.forward();
-  }
-  /**
-   * Navigates back in the platform's history.
-   */
-  back() {
-    this._locationStrategy.back();
-  }
-  /**
-   * Navigate to a specific page from session history, identified by its relative position to the
-   * current page.
-   *
-   * @param relativePosition  Position of the target page in the history relative to the current
-   *     page.
-   * A negative value moves backwards, a positive value moves forwards, e.g. `location.historyGo(2)`
-   * moves forward two pages and `location.historyGo(-2)` moves back two pages. When we try to go
-   * beyond what's stored in the history session, we stay in the current page. Same behaviour occurs
-   * when `relativePosition` equals 0.
-   * @see https://developer.mozilla.org/en-US/docs/Web/API/History_API#Moving_to_a_specific_point_in_history
-   */
-  historyGo(relativePosition = 0) {
-    this._locationStrategy.historyGo?.(relativePosition);
-  }
-  /**
-   * Registers a URL change listener. Use to catch updates performed by the Angular
-   * framework that are not detectible through "popstate" or "hashchange" events.
-   *
-   * @param fn The change handler function, which take a URL and a location history state.
-   * @returns A function that, when executed, unregisters a URL change listener.
-   */
-  onUrlChange(fn) {
-    this._urlChangeListeners.push(fn);
-    this._urlChangeSubscription ??= this.subscribe((v) => {
-      this._notifyUrlChangeListeners(v.url, v.state);
-    });
-    return () => {
-      const fnIndex = this._urlChangeListeners.indexOf(fn);
-      this._urlChangeListeners.splice(fnIndex, 1);
-      if (this._urlChangeListeners.length === 0) {
-        this._urlChangeSubscription?.unsubscribe();
-        this._urlChangeSubscription = null;
-      }
-    };
-  }
-  /** @internal */
-  _notifyUrlChangeListeners(url = "", state) {
-    this._urlChangeListeners.forEach((fn) => fn(url, state));
-  }
-  /**
-   * Subscribes to the platform's `popState` events.
-   *
-   * Note: `Location.go()` does not trigger the `popState` event in the browser. Use
-   * `Location.onUrlChange()` to subscribe to URL changes instead.
-   *
-   * @param value Event that is triggered when the state history changes.
-   * @param exception The exception to throw.
-   *
-   * @see [onpopstate](https://developer.mozilla.org/en-US/docs/Web/API/WindowEventHandlers/onpopstate)
-   *
-   * @returns Subscribed events.
-   */
-  subscribe(onNext, onThrow, onReturn) {
-    return this._subject.subscribe({
-      next: onNext,
-      error: onThrow ?? void 0,
-      complete: onReturn ?? void 0
-    });
-  }
-  /**
-   * Normalizes URL parameters by prepending with `?` if needed.
-   *
-   * @param  params String of URL parameters.
-   *
-   * @returns The normalized URL parameters string.
-   */
-  static normalizeQueryParams = normalizeQueryParams;
-  /**
-   * Joins two parts of a URL with a slash if needed.
-   *
-   * @param start  URL string
-   * @param end    URL string
-   *
-   *
-   * @returns The joined URL string.
-   */
-  static joinWithSlash = joinWithSlash;
-  /**
-   * Removes a trailing slash from a URL string if needed.
-   * Looks for the first occurrence of either `#`, `?`, or the end of the
-   * line as `/` characters and removes the trailing slash if one exists.
-   *
-   * @param url URL string.
-   *
-   * @returns The URL string, modified if needed.
-   */
-  static stripTrailingSlash = stripTrailingSlash;
-  static ɵfac = function Location_Factory(__ngFactoryType__) {
-    return new (__ngFactoryType__ || _Location)(ɵɵinject(LocationStrategy));
-  };
-  static ɵprov = ɵɵdefineInjectable({
-    token: _Location,
-    factory: () => createLocation(),
-    providedIn: "root"
-  });
-};
-(() => {
-  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(Location, [{
-    type: Injectable,
-    args: [{
-      providedIn: "root",
-      // See #23917
-      useFactory: createLocation
-    }]
-  }], () => [{
-    type: LocationStrategy
-  }], null);
-})();
-function createLocation() {
-  return new Location(ɵɵinject(LocationStrategy));
-}
-function _stripBasePath(basePath, url) {
-  if (!basePath || !url.startsWith(basePath)) {
-    return url;
-  }
-  const strippedUrl = url.substring(basePath.length);
-  if (strippedUrl === "" || ["/", ";", "?", "#"].includes(strippedUrl[0])) {
-    return strippedUrl;
-  }
-  return url;
-}
-function _stripIndexHtml(url) {
-  return url.replace(/\/index.html$/, "");
-}
-function _stripOrigin(baseHref) {
-  const isAbsoluteUrl2 = new RegExp("^(https?:)?//").test(baseHref);
-  if (isAbsoluteUrl2) {
-    const [, pathname] = baseHref.split(/\/\/[^\/]+/);
-    return pathname;
-  }
-  return baseHref;
-}
 var CURRENCIES_EN = {
   "ADP": [void 0, void 0, 0],
   "AFN": [void 0, "؋", 0],
@@ -726,6 +559,7 @@ var CURRENCIES_EN = {
   "JMD": [void 0, "$"],
   "JOD": [void 0, void 0, 3],
   "JPY": ["¥", void 0, 0],
+  "KGS": [void 0, "⃀"],
   "KHR": [void 0, "៛"],
   "KMF": [void 0, "CF", 0],
   "KPW": [void 0, "₩", 0],
@@ -797,6 +631,7 @@ var CURRENCIES_EN = {
   "VUV": [void 0, void 0, 0],
   "XAF": ["FCFA", void 0, 0],
   "XCD": ["EC$", "$"],
+  "XCG": ["Cg."],
   "XOF": ["F CFA", void 0, 0],
   "XPF": ["CFPF", void 0, 0],
   "XXX": ["¤"],
@@ -842,77 +677,19 @@ var FormatWidth;
   FormatWidth2[FormatWidth2["Full"] = 3] = "Full";
 })(FormatWidth || (FormatWidth = {}));
 var NumberSymbol = {
-  /**
-   * Decimal separator.
-   * For `en-US`, the dot character.
-   * Example: 2,345`.`67
-   */
   Decimal: 0,
-  /**
-   * Grouping separator, typically for thousands.
-   * For `en-US`, the comma character.
-   * Example: 2`,`345.67
-   */
   Group: 1,
-  /**
-   * List-item separator.
-   * Example: "one, two, and three"
-   */
   List: 2,
-  /**
-   * Sign for percentage (out of 100).
-   * Example: 23.4%
-   */
   PercentSign: 3,
-  /**
-   * Sign for positive numbers.
-   * Example: +23
-   */
   PlusSign: 4,
-  /**
-   * Sign for negative numbers.
-   * Example: -23
-   */
   MinusSign: 5,
-  /**
-   * Computer notation for exponential value (n times a power of 10).
-   * Example: 1.2E3
-   */
   Exponential: 6,
-  /**
-   * Human-readable format of exponential.
-   * Example: 1.2x103
-   */
   SuperscriptingExponent: 7,
-  /**
-   * Sign for permille (out of 1000).
-   * Example: 23.4‰
-   */
   PerMille: 8,
-  /**
-   * Infinity, can be used with plus and minus.
-   * Example: ∞, +∞, -∞
-   */
   Infinity: 9,
-  /**
-   * Not a number.
-   * Example: NaN
-   */
   NaN: 10,
-  /**
-   * Symbol used between time units.
-   * Example: 10:52
-   */
   TimeSeparator: 11,
-  /**
-   * Decimal separator for currency values (fallback to `Decimal`).
-   * Example: $2,345.67
-   */
   CurrencyDecimal: 12,
-  /**
-   * Group separator for currency values (fallback to `Group`).
-   * Example: $2,345.67
-   */
   CurrencyGroup: 13
 };
 var WeekDay;
@@ -1006,16 +783,13 @@ function getLocaleCurrencies(locale) {
 var getLocalePluralCase2 = getLocalePluralCase;
 function checkFullData(data) {
   if (!data[LocaleDataIndex.ExtraData]) {
-    throw new Error(`Missing extra locale data for the locale "${data[LocaleDataIndex.LocaleId]}". Use "registerLocaleData" to load new data. See the "I18n guide" on angular.io to know more.`);
+    throw new RuntimeError(2303, ngDevMode && `Missing extra locale data for the locale "${data[LocaleDataIndex.LocaleId]}". Use "registerLocaleData" to load new data. See the "I18n guide" on angular.io to know more.`);
   }
 }
 function getLocaleExtraDayPeriodRules(locale) {
   const data = findLocaleData(locale);
   checkFullData(data);
-  const rules = data[LocaleDataIndex.ExtraData][
-    2
-    /* ɵExtraLocaleDataIndex.ExtraDayPeriodsRules */
-  ] || [];
+  const rules = data[LocaleDataIndex.ExtraData][2] || [];
   return rules.map((rule) => {
     if (typeof rule === "string") {
       return extractTime(rule);
@@ -1026,13 +800,7 @@ function getLocaleExtraDayPeriodRules(locale) {
 function getLocaleExtraDayPeriods(locale, formStyle, width) {
   const data = findLocaleData(locale);
   checkFullData(data);
-  const dayPeriodsData = [data[LocaleDataIndex.ExtraData][
-    0
-    /* ɵExtraLocaleDataIndex.ExtraDayPeriodFormats */
-  ], data[LocaleDataIndex.ExtraData][
-    1
-    /* ɵExtraLocaleDataIndex.ExtraDayPeriodStandalone */
-  ]];
+  const dayPeriodsData = [data[LocaleDataIndex.ExtraData][0], data[LocaleDataIndex.ExtraData][1]];
   const dayPeriods = getLastDefinedValue(dayPeriodsData, formStyle) || [];
   return getLastDefinedValue(dayPeriods, width) || [];
 }
@@ -1046,7 +814,7 @@ function getLastDefinedValue(data, index) {
       return data[i];
     }
   }
-  throw new Error("Locale data API: locale data undefined");
+  throw new RuntimeError(2304, ngDevMode && "Locale data API: locale data undefined");
 }
 function extractTime(time) {
   const [h, m] = time.split(":");
@@ -1057,58 +825,24 @@ function extractTime(time) {
 }
 function getCurrencySymbol(code, format, locale = "en") {
   const currency = getLocaleCurrencies(locale)[code] || CURRENCIES_EN[code] || [];
-  const symbolNarrow = currency[
-    1
-    /* ɵCurrencyIndex.SymbolNarrow */
-  ];
+  const symbolNarrow = currency[1];
   if (format === "narrow" && typeof symbolNarrow === "string") {
     return symbolNarrow;
   }
-  return currency[
-    0
-    /* ɵCurrencyIndex.Symbol */
-  ] || code;
+  return currency[0] || code;
 }
 var DEFAULT_NB_OF_CURRENCY_DIGITS = 2;
 function getNumberOfCurrencyDigits(code) {
   let digits;
   const currency = CURRENCIES_EN[code];
   if (currency) {
-    digits = currency[
-      2
-      /* ɵCurrencyIndex.NbOfDigits */
-    ];
+    digits = currency[2];
   }
   return typeof digits === "number" ? digits : DEFAULT_NB_OF_CURRENCY_DIGITS;
 }
 var ISO8601_DATE_REGEX = /^(\d{4,})-?(\d\d)-?(\d\d)(?:T(\d\d)(?::?(\d\d)(?::?(\d\d)(?:\.(\d+))?)?)?(Z|([+-])(\d\d):?(\d\d))?)?$/;
 var NAMED_FORMATS = {};
 var DATE_FORMATS_SPLIT = /((?:[^BEGHLMOSWYZabcdhmswyz']+)|(?:'(?:[^']|'')*')|(?:G{1,5}|y{1,4}|Y{1,4}|M{1,5}|L{1,5}|w{1,2}|W{1}|d{1,2}|E{1,6}|c{1,6}|a{1,5}|b{1,5}|B{1,5}|h{1,2}|H{1,2}|m{1,2}|s{1,2}|S{1,3}|z{1,4}|Z{1,5}|O{1,4}))([\s\S]*)/;
-var ZoneWidth;
-(function(ZoneWidth2) {
-  ZoneWidth2[ZoneWidth2["Short"] = 0] = "Short";
-  ZoneWidth2[ZoneWidth2["ShortGMT"] = 1] = "ShortGMT";
-  ZoneWidth2[ZoneWidth2["Long"] = 2] = "Long";
-  ZoneWidth2[ZoneWidth2["Extended"] = 3] = "Extended";
-})(ZoneWidth || (ZoneWidth = {}));
-var DateType;
-(function(DateType2) {
-  DateType2[DateType2["FullYear"] = 0] = "FullYear";
-  DateType2[DateType2["Month"] = 1] = "Month";
-  DateType2[DateType2["Date"] = 2] = "Date";
-  DateType2[DateType2["Hours"] = 3] = "Hours";
-  DateType2[DateType2["Minutes"] = 4] = "Minutes";
-  DateType2[DateType2["Seconds"] = 5] = "Seconds";
-  DateType2[DateType2["FractionalSeconds"] = 6] = "FractionalSeconds";
-  DateType2[DateType2["Day"] = 7] = "Day";
-})(DateType || (DateType = {}));
-var TranslationType;
-(function(TranslationType2) {
-  TranslationType2[TranslationType2["DayPeriods"] = 0] = "DayPeriods";
-  TranslationType2[TranslationType2["Days"] = 1] = "Days";
-  TranslationType2[TranslationType2["Months"] = 2] = "Months";
-  TranslationType2[TranslationType2["Eras"] = 3] = "Eras";
-})(TranslationType || (TranslationType = {}));
 function formatDate(value, format, locale, timezone) {
   let date = toDate(value);
   const namedFormat = getNamedFormat(locale, format);
@@ -1129,10 +863,13 @@ function formatDate(value, format, locale, timezone) {
       break;
     }
   }
+  if (typeof ngDevMode === "undefined" || ngDevMode) {
+    assertValidDateFormat(parts);
+  }
   let dateTimezoneOffset = date.getTimezoneOffset();
   if (timezone) {
     dateTimezoneOffset = timezoneToOffset(timezone, dateTimezoneOffset);
-    date = convertTimezoneToLocal(date, timezone, true);
+    date = convertTimezoneToLocal(date, timezone);
   }
   let text = "";
   parts.forEach((value2) => {
@@ -1140,6 +877,16 @@ function formatDate(value, format, locale, timezone) {
     text += dateFormatter ? dateFormatter(date, locale, dateTimezoneOffset) : value2 === "''" ? "'" : value2.replace(/(^'|'$)/g, "").replace(/''/g, "'");
   });
   return text;
+}
+function assertValidDateFormat(parts) {
+  if (parts.some((part) => /^Y+$/.test(part)) && !parts.some((part) => /^w+$/.test(part))) {
+    const message = `Suspicious use of week-based year "Y" in date pattern "${parts.join("")}". Did you mean to use calendar year "y" instead?`;
+    if (parts.length === 1) {
+      console.error(formatRuntimeError(2300, message));
+    } else {
+      throw new RuntimeError(2300, message);
+    }
+  }
 }
 function createDate(year, month, date) {
   const newDate = /* @__PURE__ */ new Date(0);
@@ -1242,11 +989,11 @@ function dateGetter(name, size, offset = 0, trim = false, negWrap = false) {
     if (offset > 0 || part > -offset) {
       part += offset;
     }
-    if (name === DateType.Hours) {
+    if (name === 3) {
       if (part === 0 && offset === -12) {
         part = 12;
       }
-    } else if (name === DateType.FractionalSeconds) {
+    } else if (name === 6) {
       return formatFractionalSeconds(part, size);
     }
     const localeMinus = getLocaleNumberSymbol(locale, NumberSymbol.MinusSign);
@@ -1255,24 +1002,24 @@ function dateGetter(name, size, offset = 0, trim = false, negWrap = false) {
 }
 function getDatePart(part, date) {
   switch (part) {
-    case DateType.FullYear:
+    case 0:
       return date.getFullYear();
-    case DateType.Month:
+    case 1:
       return date.getMonth();
-    case DateType.Date:
+    case 2:
       return date.getDate();
-    case DateType.Hours:
+    case 3:
       return date.getHours();
-    case DateType.Minutes:
+    case 4:
       return date.getMinutes();
-    case DateType.Seconds:
+    case 5:
       return date.getSeconds();
-    case DateType.FractionalSeconds:
+    case 6:
       return date.getMilliseconds();
-    case DateType.Day:
+    case 7:
       return date.getDay();
     default:
-      throw new Error(`Unknown DateType value "${part}".`);
+      throw new RuntimeError(2301, ngDevMode && `Unknown DateType value "${part}".`);
   }
 }
 function dateStrGetter(name, width, form = FormStyle.Format, extended = false) {
@@ -1282,11 +1029,11 @@ function dateStrGetter(name, width, form = FormStyle.Format, extended = false) {
 }
 function getDateTranslation(date, locale, name, width, form, extended) {
   switch (name) {
-    case TranslationType.Months:
+    case 2:
       return getLocaleMonthNames(locale, form, width)[date.getMonth()];
-    case TranslationType.Days:
+    case 1:
       return getLocaleDayNames(locale, form, width)[date.getDay()];
-    case TranslationType.DayPeriods:
+    case 0:
       const currentHours = date.getHours();
       const currentMinutes = date.getMinutes();
       if (extended) {
@@ -1316,11 +1063,11 @@ function getDateTranslation(date, locale, name, width, form, extended) {
         }
       }
       return getLocaleDayPeriods(locale, form, width)[currentHours < 12 ? 0 : 1];
-    case TranslationType.Eras:
+    case 3:
       return getLocaleEraNames(locale, width)[date.getFullYear() <= 0 ? 0 : 1];
     default:
       const unexpected = name;
-      throw new Error(`unexpected translation type ${unexpected}`);
+      throw new RuntimeError(2302, ngDevMode && `unexpected translation type ${unexpected}`);
   }
 }
 function timeZoneGetter(width) {
@@ -1329,20 +1076,20 @@ function timeZoneGetter(width) {
     const minusSign = getLocaleNumberSymbol(locale, NumberSymbol.MinusSign);
     const hours = zone > 0 ? Math.floor(zone / 60) : Math.ceil(zone / 60);
     switch (width) {
-      case ZoneWidth.Short:
+      case 0:
         return (zone >= 0 ? "+" : "") + padNumber(hours, 2, minusSign) + padNumber(Math.abs(zone % 60), 2, minusSign);
-      case ZoneWidth.ShortGMT:
+      case 1:
         return "GMT" + (zone >= 0 ? "+" : "") + padNumber(hours, 1, minusSign);
-      case ZoneWidth.Long:
+      case 2:
         return "GMT" + (zone >= 0 ? "+" : "") + padNumber(hours, 2, minusSign) + ":" + padNumber(Math.abs(zone % 60), 2, minusSign);
-      case ZoneWidth.Extended:
+      case 3:
         if (offset === 0) {
           return "Z";
         } else {
           return (zone >= 0 ? "+" : "") + padNumber(hours, 2, minusSign) + ":" + padNumber(Math.abs(zone % 60), 2, minusSign);
         }
       default:
-        throw new Error(`Unknown zone width "${width}"`);
+        throw new RuntimeError(2310, ngDevMode && `Unknown zone width "${width}"`);
     }
   };
 }
@@ -1390,25 +1137,25 @@ function getDateFormatter(format) {
     case "G":
     case "GG":
     case "GGG":
-      formatter = dateStrGetter(TranslationType.Eras, TranslationWidth.Abbreviated);
+      formatter = dateStrGetter(3, TranslationWidth.Abbreviated);
       break;
     case "GGGG":
-      formatter = dateStrGetter(TranslationType.Eras, TranslationWidth.Wide);
+      formatter = dateStrGetter(3, TranslationWidth.Wide);
       break;
     case "GGGGG":
-      formatter = dateStrGetter(TranslationType.Eras, TranslationWidth.Narrow);
+      formatter = dateStrGetter(3, TranslationWidth.Narrow);
       break;
     case "y":
-      formatter = dateGetter(DateType.FullYear, 1, 0, false, true);
+      formatter = dateGetter(0, 1, 0, false, true);
       break;
     case "yy":
-      formatter = dateGetter(DateType.FullYear, 2, 0, true, true);
+      formatter = dateGetter(0, 2, 0, true, true);
       break;
     case "yyy":
-      formatter = dateGetter(DateType.FullYear, 3, 0, false, true);
+      formatter = dateGetter(0, 3, 0, false, true);
       break;
     case "yyyy":
-      formatter = dateGetter(DateType.FullYear, 4, 0, false, true);
+      formatter = dateGetter(0, 4, 0, false, true);
       break;
     case "Y":
       formatter = weekNumberingYearGetter(1);
@@ -1424,29 +1171,29 @@ function getDateFormatter(format) {
       break;
     case "M":
     case "L":
-      formatter = dateGetter(DateType.Month, 1, 1);
+      formatter = dateGetter(1, 1, 1);
       break;
     case "MM":
     case "LL":
-      formatter = dateGetter(DateType.Month, 2, 1);
+      formatter = dateGetter(1, 2, 1);
       break;
     case "MMM":
-      formatter = dateStrGetter(TranslationType.Months, TranslationWidth.Abbreviated);
+      formatter = dateStrGetter(2, TranslationWidth.Abbreviated);
       break;
     case "MMMM":
-      formatter = dateStrGetter(TranslationType.Months, TranslationWidth.Wide);
+      formatter = dateStrGetter(2, TranslationWidth.Wide);
       break;
     case "MMMMM":
-      formatter = dateStrGetter(TranslationType.Months, TranslationWidth.Narrow);
+      formatter = dateStrGetter(2, TranslationWidth.Narrow);
       break;
     case "LLL":
-      formatter = dateStrGetter(TranslationType.Months, TranslationWidth.Abbreviated, FormStyle.Standalone);
+      formatter = dateStrGetter(2, TranslationWidth.Abbreviated, FormStyle.Standalone);
       break;
     case "LLLL":
-      formatter = dateStrGetter(TranslationType.Months, TranslationWidth.Wide, FormStyle.Standalone);
+      formatter = dateStrGetter(2, TranslationWidth.Wide, FormStyle.Standalone);
       break;
     case "LLLLL":
-      formatter = dateStrGetter(TranslationType.Months, TranslationWidth.Narrow, FormStyle.Standalone);
+      formatter = dateStrGetter(2, TranslationWidth.Narrow, FormStyle.Standalone);
       break;
     case "w":
       formatter = weekGetter(1);
@@ -1458,114 +1205,114 @@ function getDateFormatter(format) {
       formatter = weekGetter(1, true);
       break;
     case "d":
-      formatter = dateGetter(DateType.Date, 1);
+      formatter = dateGetter(2, 1);
       break;
     case "dd":
-      formatter = dateGetter(DateType.Date, 2);
+      formatter = dateGetter(2, 2);
       break;
     case "c":
     case "cc":
-      formatter = dateGetter(DateType.Day, 1);
+      formatter = dateGetter(7, 1);
       break;
     case "ccc":
-      formatter = dateStrGetter(TranslationType.Days, TranslationWidth.Abbreviated, FormStyle.Standalone);
+      formatter = dateStrGetter(1, TranslationWidth.Abbreviated, FormStyle.Standalone);
       break;
     case "cccc":
-      formatter = dateStrGetter(TranslationType.Days, TranslationWidth.Wide, FormStyle.Standalone);
+      formatter = dateStrGetter(1, TranslationWidth.Wide, FormStyle.Standalone);
       break;
     case "ccccc":
-      formatter = dateStrGetter(TranslationType.Days, TranslationWidth.Narrow, FormStyle.Standalone);
+      formatter = dateStrGetter(1, TranslationWidth.Narrow, FormStyle.Standalone);
       break;
     case "cccccc":
-      formatter = dateStrGetter(TranslationType.Days, TranslationWidth.Short, FormStyle.Standalone);
+      formatter = dateStrGetter(1, TranslationWidth.Short, FormStyle.Standalone);
       break;
     case "E":
     case "EE":
     case "EEE":
-      formatter = dateStrGetter(TranslationType.Days, TranslationWidth.Abbreviated);
+      formatter = dateStrGetter(1, TranslationWidth.Abbreviated);
       break;
     case "EEEE":
-      formatter = dateStrGetter(TranslationType.Days, TranslationWidth.Wide);
+      formatter = dateStrGetter(1, TranslationWidth.Wide);
       break;
     case "EEEEE":
-      formatter = dateStrGetter(TranslationType.Days, TranslationWidth.Narrow);
+      formatter = dateStrGetter(1, TranslationWidth.Narrow);
       break;
     case "EEEEEE":
-      formatter = dateStrGetter(TranslationType.Days, TranslationWidth.Short);
+      formatter = dateStrGetter(1, TranslationWidth.Short);
       break;
     case "a":
     case "aa":
     case "aaa":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Abbreviated);
+      formatter = dateStrGetter(0, TranslationWidth.Abbreviated);
       break;
     case "aaaa":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Wide);
+      formatter = dateStrGetter(0, TranslationWidth.Wide);
       break;
     case "aaaaa":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Narrow);
+      formatter = dateStrGetter(0, TranslationWidth.Narrow);
       break;
     case "b":
     case "bb":
     case "bbb":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Abbreviated, FormStyle.Standalone, true);
+      formatter = dateStrGetter(0, TranslationWidth.Abbreviated, FormStyle.Standalone, true);
       break;
     case "bbbb":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Wide, FormStyle.Standalone, true);
+      formatter = dateStrGetter(0, TranslationWidth.Wide, FormStyle.Standalone, true);
       break;
     case "bbbbb":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Narrow, FormStyle.Standalone, true);
+      formatter = dateStrGetter(0, TranslationWidth.Narrow, FormStyle.Standalone, true);
       break;
     case "B":
     case "BB":
     case "BBB":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Abbreviated, FormStyle.Format, true);
+      formatter = dateStrGetter(0, TranslationWidth.Abbreviated, FormStyle.Format, true);
       break;
     case "BBBB":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Wide, FormStyle.Format, true);
+      formatter = dateStrGetter(0, TranslationWidth.Wide, FormStyle.Format, true);
       break;
     case "BBBBB":
-      formatter = dateStrGetter(TranslationType.DayPeriods, TranslationWidth.Narrow, FormStyle.Format, true);
+      formatter = dateStrGetter(0, TranslationWidth.Narrow, FormStyle.Format, true);
       break;
     case "h":
-      formatter = dateGetter(DateType.Hours, 1, -12);
+      formatter = dateGetter(3, 1, -12);
       break;
     case "hh":
-      formatter = dateGetter(DateType.Hours, 2, -12);
+      formatter = dateGetter(3, 2, -12);
       break;
     case "H":
-      formatter = dateGetter(DateType.Hours, 1);
+      formatter = dateGetter(3, 1);
       break;
     case "HH":
-      formatter = dateGetter(DateType.Hours, 2);
+      formatter = dateGetter(3, 2);
       break;
     case "m":
-      formatter = dateGetter(DateType.Minutes, 1);
+      formatter = dateGetter(4, 1);
       break;
     case "mm":
-      formatter = dateGetter(DateType.Minutes, 2);
+      formatter = dateGetter(4, 2);
       break;
     case "s":
-      formatter = dateGetter(DateType.Seconds, 1);
+      formatter = dateGetter(5, 1);
       break;
     case "ss":
-      formatter = dateGetter(DateType.Seconds, 2);
+      formatter = dateGetter(5, 2);
       break;
     case "S":
-      formatter = dateGetter(DateType.FractionalSeconds, 1);
+      formatter = dateGetter(6, 1);
       break;
     case "SS":
-      formatter = dateGetter(DateType.FractionalSeconds, 2);
+      formatter = dateGetter(6, 2);
       break;
     case "SSS":
-      formatter = dateGetter(DateType.FractionalSeconds, 3);
+      formatter = dateGetter(6, 3);
       break;
     case "Z":
     case "ZZ":
     case "ZZZ":
-      formatter = timeZoneGetter(ZoneWidth.Short);
+      formatter = timeZoneGetter(0);
       break;
     case "ZZZZZ":
-      formatter = timeZoneGetter(ZoneWidth.Extended);
+      formatter = timeZoneGetter(3);
       break;
     case "O":
     case "OO":
@@ -1573,12 +1320,12 @@ function getDateFormatter(format) {
     case "z":
     case "zz":
     case "zzz":
-      formatter = timeZoneGetter(ZoneWidth.ShortGMT);
+      formatter = timeZoneGetter(1);
       break;
     case "OOOO":
     case "ZZZZ":
     case "zzzz":
-      formatter = timeZoneGetter(ZoneWidth.Long);
+      formatter = timeZoneGetter(2);
       break;
     default:
       return null;
@@ -1597,7 +1344,7 @@ function addDateMinutes(date, minutes) {
   return date;
 }
 function convertTimezoneToLocal(date, timezone, reverse) {
-  const reverseValue = reverse ? -1 : 1;
+  const reverseValue = -1;
   const dateTimezoneOffset = date.getTimezoneOffset();
   const timezoneOffset = timezoneToOffset(timezone, dateTimezoneOffset);
   return addDateMinutes(date, reverseValue * (timezoneOffset - dateTimezoneOffset));
@@ -1626,7 +1373,7 @@ function toDate(value) {
   }
   const date = new Date(value);
   if (!isDate(date)) {
-    throw new Error(`Unable to convert "${value}" into a date`);
+    throw new RuntimeError(2311, ngDevMode && `Unable to convert "${value}" into a date`);
   }
   return date;
 }
@@ -1676,7 +1423,7 @@ function formatNumberToLocaleString(value, pattern, locale, groupSymbol, decimal
     if (digitsInfo) {
       const parts = digitsInfo.match(NUMBER_FORMAT_REGEXP);
       if (parts === null) {
-        throw new Error(`${digitsInfo} is not a valid digit info`);
+        throw new RuntimeError(2306, ngDevMode && `${digitsInfo} is not a valid digit info`);
       }
       const minIntPart = parts[1];
       const minFractionPart = parts[3];
@@ -1853,7 +1600,7 @@ function parseNumber(num) {
 }
 function roundNumber(parsedNumber, minFrac, maxFrac) {
   if (minFrac > maxFrac) {
-    throw new Error(`The minimum number of digits after fraction (${minFrac}) is higher than the maximum (${maxFrac}).`);
+    throw new RuntimeError(2307, ngDevMode && `The minimum number of digits after fraction (${minFrac}) is higher than the maximum (${maxFrac}).`);
   }
   let digits = parsedNumber.digits;
   let fractionLen = digits.length - parsedNumber.integerLen;
@@ -1907,7 +1654,7 @@ function roundNumber(parsedNumber, minFrac, maxFrac) {
 function parseIntAutoRadix(text) {
   const result = parseInt(text);
   if (isNaN(result)) {
-    throw new Error("Invalid integer literal when parsing " + text);
+    throw new RuntimeError(2305, ngDevMode && "Invalid integer literal when parsing " + text);
   }
   return result;
 }
@@ -1917,15 +1664,7 @@ var NgLocalization = class _NgLocalization {
   };
   static ɵprov = ɵɵdefineInjectable({
     token: _NgLocalization,
-    factory: function NgLocalization_Factory(__ngFactoryType__) {
-      let __ngConditionalFactory__ = null;
-      if (__ngFactoryType__) {
-        __ngConditionalFactory__ = new __ngFactoryType__();
-      } else {
-        __ngConditionalFactory__ = ((locale) => new NgLocaleLocalization(locale))(ɵɵinject(LOCALE_ID));
-      }
-      return __ngConditionalFactory__;
-    },
+    factory: () => (() => new NgLocaleLocalization(inject(LOCALE_ID)))(),
     providedIn: "root"
   });
 };
@@ -1934,8 +1673,7 @@ var NgLocalization = class _NgLocalization {
     type: Injectable,
     args: [{
       providedIn: "root",
-      useFactory: (locale) => new NgLocaleLocalization(locale),
-      deps: [LOCALE_ID]
+      useFactory: () => new NgLocaleLocalization(inject(LOCALE_ID))
     }]
   }], null, null);
 })();
@@ -1951,7 +1689,7 @@ function getPluralCategory(value, cases, ngLocalization, locale) {
   if (cases.indexOf("other") > -1) {
     return "other";
   }
-  throw new Error(`No plural message found for value "${value}"`);
+  throw new RuntimeError(2308, ngDevMode && `No plural message found for value "${value}"`);
 }
 var NgLocaleLocalization = class _NgLocaleLocalization extends NgLocalization {
   locale;
@@ -1995,20 +1733,6 @@ var NgLocaleLocalization = class _NgLocaleLocalization extends NgLocalization {
     }]
   }], null);
 })();
-function registerLocaleData2(data, localeId, extraData) {
-  return registerLocaleData(data, localeId, extraData);
-}
-function parseCookieValue(cookieStr, name) {
-  name = encodeURIComponent(name);
-  for (const cookie of cookieStr.split(";")) {
-    const eqIndex = cookie.indexOf("=");
-    const [cookieName, cookieValue] = eqIndex == -1 ? [cookie, ""] : [cookie.slice(0, eqIndex), cookie.slice(eqIndex + 1)];
-    if (cookieName.trim() === name) {
-      return decodeURIComponent(cookieValue);
-    }
-  }
-  return null;
-}
 var WS_REGEXP = /\s+/;
 var EMPTY_ARRAY = [];
 var NgClass = class _NgClass {
@@ -2027,28 +1751,6 @@ var NgClass = class _NgClass {
   set ngClass(value) {
     this.rawClass = typeof value === "string" ? value.trim().split(WS_REGEXP) : value;
   }
-  /*
-  The NgClass directive uses the custom change detection algorithm for its inputs. The custom
-  algorithm is necessary since inputs are represented as complex object or arrays that need to be
-  deeply-compared.
-     This algorithm is perf-sensitive since NgClass is used very frequently and its poor performance
-  might negatively impact runtime performance of the entire change detection cycle. The design of
-  this algorithm is making sure that:
-  - there is no unnecessary DOM manipulation (CSS classes are added / removed from the DOM only when
-  needed), even if references to bound objects change;
-  - there is no memory allocation if nothing changes (even relatively modest memory allocation
-  during the change detection cycle can result in GC pauses for some of the CD cycles).
-     The algorithm works by iterating over the set of bound classes, staring with [class] binding and
-  then going over [ngClass] binding. For each CSS class name:
-  - check if it was seen before (this information is tracked in the state map) and if its value
-  changed;
-  - mark it as "touched" - names that are not marked are not present in the latest set of binding
-  and we can remove such class name from the internal data structures;
-     After iteration over all the CSS class names we've got data structure with all the information
-  necessary to synchronize changes to the DOM - it is enough to iterate over the state map, flush
-  changes to the DOM and reset internal data structures so those are ready for the next change
-  detection cycle.
-   */
   ngDoCheck() {
     for (const klass of this.initialClasses) {
       this._updateState(klass, true);
@@ -2152,30 +1854,24 @@ var NgComponentOutlet = class _NgComponentOutlet {
   ngComponentOutlet = null;
   ngComponentOutletInputs;
   ngComponentOutletInjector;
+  ngComponentOutletEnvironmentInjector;
   ngComponentOutletContent;
   ngComponentOutletNgModule;
-  /**
-   * @deprecated This input is deprecated, use `ngComponentOutletNgModule` instead.
-   */
-  ngComponentOutletNgModuleFactory;
   _componentRef;
   _moduleRef;
-  /**
-   * A helper data structure that allows us to track inputs that were part of the
-   * ngComponentOutletInputs expression. Tracking inputs is necessary for proper removal of ones
-   * that are no longer referenced.
-   */
   _inputsUsed = /* @__PURE__ */ new Map();
+  get componentInstance() {
+    return this._componentRef?.instance ?? null;
+  }
   constructor(_viewContainerRef) {
     this._viewContainerRef = _viewContainerRef;
   }
   _needToReCreateNgModuleInstance(changes) {
-    return changes["ngComponentOutletNgModule"] !== void 0 || changes["ngComponentOutletNgModuleFactory"] !== void 0;
+    return changes["ngComponentOutletNgModule"] !== void 0;
   }
   _needToReCreateComponentInstance(changes) {
-    return changes["ngComponentOutlet"] !== void 0 || changes["ngComponentOutletContent"] !== void 0 || changes["ngComponentOutletInjector"] !== void 0 || this._needToReCreateNgModuleInstance(changes);
+    return changes["ngComponentOutlet"] !== void 0 || changes["ngComponentOutletContent"] !== void 0 || changes["ngComponentOutletInjector"] !== void 0 || changes["ngComponentOutletEnvironmentInjector"] !== void 0 || this._needToReCreateNgModuleInstance(changes);
   }
-  /** @nodoc */
   ngOnChanges(changes) {
     if (this._needToReCreateComponentInstance(changes)) {
       this._viewContainerRef.clear();
@@ -2187,8 +1883,6 @@ var NgComponentOutlet = class _NgComponentOutlet {
           this._moduleRef?.destroy();
           if (this.ngComponentOutletNgModule) {
             this._moduleRef = createNgModule(this.ngComponentOutletNgModule, getParentInjector(injector));
-          } else if (this.ngComponentOutletNgModuleFactory) {
-            this._moduleRef = this.ngComponentOutletNgModuleFactory.create(getParentInjector(injector));
           } else {
             this._moduleRef = void 0;
           }
@@ -2196,12 +1890,12 @@ var NgComponentOutlet = class _NgComponentOutlet {
         this._componentRef = this._viewContainerRef.createComponent(this.ngComponentOutlet, {
           injector,
           ngModuleRef: this._moduleRef,
-          projectableNodes: this.ngComponentOutletContent
+          projectableNodes: this.ngComponentOutletContent,
+          environmentInjector: this.ngComponentOutletEnvironmentInjector
         });
       }
     }
   }
-  /** @nodoc */
   ngDoCheck() {
     if (this._componentRef) {
       if (this.ngComponentOutletInputs) {
@@ -2212,7 +1906,6 @@ var NgComponentOutlet = class _NgComponentOutlet {
       this._applyInputStateDiff(this._componentRef);
     }
   }
-  /** @nodoc */
   ngOnDestroy() {
     this._moduleRef?.destroy();
   }
@@ -2237,10 +1930,11 @@ var NgComponentOutlet = class _NgComponentOutlet {
       ngComponentOutlet: "ngComponentOutlet",
       ngComponentOutletInputs: "ngComponentOutletInputs",
       ngComponentOutletInjector: "ngComponentOutletInjector",
+      ngComponentOutletEnvironmentInjector: "ngComponentOutletEnvironmentInjector",
       ngComponentOutletContent: "ngComponentOutletContent",
-      ngComponentOutletNgModule: "ngComponentOutletNgModule",
-      ngComponentOutletNgModuleFactory: "ngComponentOutletNgModuleFactory"
+      ngComponentOutletNgModule: "ngComponentOutletNgModule"
     },
+    exportAs: ["ngComponentOutlet"],
     features: [ɵɵNgOnChangesFeature]
   });
 };
@@ -2249,7 +1943,7 @@ var NgComponentOutlet = class _NgComponentOutlet {
     type: Directive,
     args: [{
       selector: "[ngComponentOutlet]",
-      standalone: true
+      exportAs: "ngComponentOutlet"
     }]
   }], () => [{
     type: ViewContainerRef
@@ -2263,13 +1957,13 @@ var NgComponentOutlet = class _NgComponentOutlet {
     ngComponentOutletInjector: [{
       type: Input
     }],
+    ngComponentOutletEnvironmentInjector: [{
+      type: Input
+    }],
     ngComponentOutletContent: [{
       type: Input
     }],
     ngComponentOutletNgModule: [{
-      type: Input
-    }],
-    ngComponentOutletNgModuleFactory: [{
       type: Input
     }]
   });
@@ -2289,19 +1983,15 @@ var NgForOfContext = class {
     this.index = index;
     this.count = count;
   }
-  // Indicates whether this is the first item in the collection.
   get first() {
     return this.index === 0;
   }
-  // Indicates whether this is the last item in the collection.
   get last() {
     return this.index === this.count - 1;
   }
-  // Indicates whether an index of this item in the collection is even.
   get even() {
     return this.index % 2 === 0;
   }
-  // Indicates whether an index of this item in the collection is odd.
   get odd() {
     return !this.even;
   }
@@ -2310,35 +2000,13 @@ var NgForOf = class _NgForOf {
   _viewContainer;
   _template;
   _differs;
-  /**
-   * The value of the iterable expression, which can be used as a
-   * [template input variable](guide/directives/structural-directives#shorthand).
-   */
   set ngForOf(ngForOf) {
     this._ngForOf = ngForOf;
     this._ngForOfDirty = true;
   }
-  /**
-   * Specifies a custom `TrackByFunction` to compute the identity of items in an iterable.
-   *
-   * If a custom `TrackByFunction` is not provided, `NgForOf` will use the item's [object
-   * identity](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/is)
-   * as the key.
-   *
-   * `NgForOf` uses the computed key to associate items in an iterable with DOM elements
-   * it produces for these items.
-   *
-   * A custom `TrackByFunction` is useful to provide good user experience in cases when items in an
-   * iterable rendered using `NgForOf` have a natural identifier (for example, custom ID or a
-   * primary key), and this iterable could be updated with new object instances that still
-   * represent the same underlying entity (for example, when data is re-fetched from the server,
-   * and the iterable is recreated and re-rendered, but most of the data is still the same).
-   *
-   * @see {@link TrackByFunction}
-   */
   set ngForTrackBy(fn) {
     if ((typeof ngDevMode === "undefined" || ngDevMode) && fn != null && typeof fn !== "function") {
-      console.warn(`trackBy must be a function, but received ${JSON.stringify(fn)}. See https://angular.io/api/common/NgForOf#change-propagation for more information.`);
+      console.warn(`trackBy must be a function, but received ${JSON.stringify(fn)}. See https://angular.dev/api/common/NgForOf#change-propagation for more information.`);
     }
     this._trackByFn = fn;
   }
@@ -2348,28 +2016,17 @@ var NgForOf = class _NgForOf {
   _ngForOf = null;
   _ngForOfDirty = true;
   _differ = null;
-  // TODO(issue/24571): remove '!'
-  // waiting for microsoft/typescript#43662 to allow the return type `TrackByFunction|undefined` for
-  // the getter
   _trackByFn;
   constructor(_viewContainer, _template, _differs) {
     this._viewContainer = _viewContainer;
     this._template = _template;
     this._differs = _differs;
   }
-  /**
-   * A reference to the template that is stamped out for each item in the iterable.
-   * @see [template reference variable](guide/templates/variables#template-reference-variables)
-   */
   set ngForTemplate(value) {
     if (value) {
       this._template = value;
     }
   }
-  /**
-   * Applies the changes when needed.
-   * @nodoc
-   */
   ngDoCheck() {
     if (this._ngForOfDirty) {
       this._ngForOfDirty = false;
@@ -2420,12 +2077,6 @@ var NgForOf = class _NgForOf {
       applyViewChange(viewRef, record);
     });
   }
-  /**
-   * Asserts the correct type of the context for the template that `NgForOf` will render.
-   *
-   * The presence of this method is a signal to the Ivy template type-check compiler that the
-   * `NgForOf` structural directive renders its template with a specific context type.
-   */
   static ngTemplateContextGuard(dir, ctx) {
     return true;
   }
@@ -2483,27 +2134,18 @@ var NgIf = class _NgIf {
     this._viewContainer = _viewContainer;
     this._thenTemplateRef = templateRef;
   }
-  /**
-   * The Boolean expression to evaluate as the condition for showing a template.
-   */
   set ngIf(condition) {
     this._context.$implicit = this._context.ngIf = condition;
     this._updateView();
   }
-  /**
-   * A template to show if the condition expression evaluates to true.
-   */
   set ngIfThen(templateRef) {
-    assertTemplate("ngIfThen", templateRef);
+    assertTemplate(templateRef, (typeof ngDevMode === "undefined" || ngDevMode) && "ngIfThen");
     this._thenTemplateRef = templateRef;
     this._thenViewRef = null;
     this._updateView();
   }
-  /**
-   * A template to show if the condition expression evaluates to false.
-   */
   set ngIfElse(templateRef) {
-    assertTemplate("ngIfElse", templateRef);
+    assertTemplate(templateRef, (typeof ngDevMode === "undefined" || ngDevMode) && "ngIfElse");
     this._elseTemplateRef = templateRef;
     this._elseViewRef = null;
     this._updateView();
@@ -2527,23 +2169,8 @@ var NgIf = class _NgIf {
       }
     }
   }
-  /** @internal */
   static ngIfUseIfTypeGuard;
-  /**
-   * Assert the correct type of the expression bound to the `ngIf` input within the template.
-   *
-   * The presence of this static field is a signal to the Ivy template type check compiler that
-   * when the `NgIf` structural directive renders its template, the type of the expression bound
-   * to `ngIf` should be narrowed in some way. For `NgIf`, the binding expression itself is used to
-   * narrow its type, which allows the strictNullChecks feature of TypeScript to work with `NgIf`.
-   */
   static ngTemplateGuard_ngIf;
-  /**
-   * Asserts the correct type of the context for the template that `NgIf` will render.
-   *
-   * The presence of this method is a signal to the Ivy template type-check compiler that the
-   * `NgIf` structural directive renders its template with a specific context type.
-   */
   static ngTemplateContextGuard(dir, ctx) {
     return true;
   }
@@ -2586,10 +2213,9 @@ var NgIfContext = class {
   $implicit = null;
   ngIf = null;
 };
-function assertTemplate(property, templateRef) {
-  const isTemplateRefOrNull = !!(!templateRef || templateRef.createEmbeddedView);
-  if (!isTemplateRefOrNull) {
-    throw new Error(`${property} must be a TemplateRef, but received '${stringify(templateRef)}'.`);
+function assertTemplate(templateRef, property) {
+  if (templateRef && !templateRef.createEmbeddedView) {
+    throw new RuntimeError(2020, (typeof ngDevMode === "undefined" || ngDevMode) && `${property} must be a TemplateRef, but received '${stringify(templateRef)}'.`);
   }
 }
 var SwitchView = class {
@@ -2629,15 +2255,12 @@ var NgSwitch = class _NgSwitch {
       this._updateDefaultCases(true);
     }
   }
-  /** @internal */
   _addCase() {
     return this._caseCount++;
   }
-  /** @internal */
   _addDefault(view) {
     this._defaultViews.push(view);
   }
-  /** @internal */
   _matchCase(value) {
     const matched = value === this._ngSwitch;
     this._lastCasesMatched ||= matched;
@@ -2683,9 +2306,6 @@ var NgSwitch = class _NgSwitch {
 var NgSwitchCase = class _NgSwitchCase {
   ngSwitch;
   _view;
-  /**
-   * Stores the HTML template to be selected on match.
-   */
   ngSwitchCase;
   constructor(viewContainer, templateRef, ngSwitch) {
     this.ngSwitch = ngSwitch;
@@ -2695,10 +2315,6 @@ var NgSwitchCase = class _NgSwitchCase {
     ngSwitch._addCase();
     this._view = new SwitchView(viewContainer, templateRef);
   }
-  /**
-   * Performs case matching. For internal use only.
-   * @nodoc
-   */
   ngDoCheck() {
     this._view.enforceState(this.ngSwitch._matchCase(this.ngSwitchCase));
   }
@@ -2936,18 +2552,8 @@ var NgStyle = class _NgStyle {
 var NgTemplateOutlet = class _NgTemplateOutlet {
   _viewContainerRef;
   _viewRef = null;
-  /**
-   * A context object to attach to the {@link EmbeddedViewRef}. This should be an
-   * object, the object's keys will be available for binding by the local template `let`
-   * declarations.
-   * Using the key `$implicit` in the context object will set its value as default.
-   */
   ngTemplateOutletContext = null;
-  /**
-   * A string defining the template reference and optionally the context object for the template.
-   */
   ngTemplateOutlet = null;
-  /** Injector to be used within the embedded view. */
   ngTemplateOutletInjector = null;
   constructor(_viewContainerRef) {
     this._viewContainerRef = _viewContainerRef;
@@ -2968,19 +2574,9 @@ var NgTemplateOutlet = class _NgTemplateOutlet {
       });
     }
   }
-  /**
-   * We need to re-create existing embedded view if either is true:
-   * - the outlet changed.
-   * - the injector changed.
-   */
   _shouldRecreateView(changes) {
     return !!changes["ngTemplateOutlet"] || !!changes["ngTemplateOutletInjector"];
   }
-  /**
-   * For a given outlet instance, we create a proxy object that delegates
-   * to the user-specified context. This allows changing, or swapping out
-   * the context object completely without having to destroy/re-create the view.
-   */
   _createContextForwardProxy() {
     return new Proxy({}, {
       set: (_target, prop, newValue) => {
@@ -3036,12 +2632,10 @@ function invalidPipeArgumentError(type, value) {
   return new RuntimeError(2100, ngDevMode && `InvalidPipeArgument: '${value}' for pipe '${stringify(type)}'`);
 }
 var SubscribableStrategy = class {
-  createSubscription(async, updateLatestValue) {
+  createSubscription(async, updateLatestValue, onError) {
     return untracked(() => async.subscribe({
       next: updateLatestValue,
-      error: (e) => {
-        throw e;
-      }
+      error: onError
     }));
   }
   dispose(subscription) {
@@ -3049,12 +2643,17 @@ var SubscribableStrategy = class {
   }
 };
 var PromiseStrategy = class {
-  createSubscription(async, updateLatestValue) {
-    return async.then(updateLatestValue, (e) => {
-      throw e;
-    });
+  createSubscription(async, updateLatestValue, onError) {
+    async.then((v) => updateLatestValue?.(v), (e) => onError?.(e));
+    return {
+      unsubscribe: () => {
+        updateLatestValue = null;
+        onError = null;
+      }
+    };
   }
   dispose(subscription) {
+    subscription.unsubscribe();
   }
 };
 var _promiseStrategy = new PromiseStrategy();
@@ -3066,6 +2665,7 @@ var AsyncPipe = class _AsyncPipe {
   _subscription = null;
   _obj = null;
   _strategy = null;
+  applicationErrorHandler = inject(INTERNAL_APPLICATION_ERROR_HANDLER);
   constructor(ref) {
     this._ref = ref;
   }
@@ -3096,7 +2696,7 @@ var AsyncPipe = class _AsyncPipe {
   _subscribe(obj) {
     this._obj = obj;
     this._strategy = this._selectStrategy(obj);
-    this._subscription = this._strategy.createSubscription(obj, (value) => this._updateLatestValue(obj, value));
+    this._subscription = this._strategy.createSubscription(obj, (value) => this._updateLatestValue(obj, value), (e) => this.applicationErrorHandler(e));
   }
   _selectStrategy(obj) {
     if (isPromise(obj)) {
@@ -3218,8 +2818,8 @@ var UpperCasePipe = class _UpperCasePipe {
   }], null, null);
 })();
 var DEFAULT_DATE_FORMAT = "mediumDate";
-var DATE_PIPE_DEFAULT_TIMEZONE = new InjectionToken(ngDevMode ? "DATE_PIPE_DEFAULT_TIMEZONE" : "");
-var DATE_PIPE_DEFAULT_OPTIONS = new InjectionToken(ngDevMode ? "DATE_PIPE_DEFAULT_OPTIONS" : "");
+var DATE_PIPE_DEFAULT_TIMEZONE = new InjectionToken(typeof ngDevMode !== "undefined" && ngDevMode ? "DATE_PIPE_DEFAULT_TIMEZONE" : "");
+var DATE_PIPE_DEFAULT_OPTIONS = new InjectionToken(typeof ngDevMode !== "undefined" && ngDevMode ? "DATE_PIPE_DEFAULT_OPTIONS" : "");
 var DatePipe = class _DatePipe {
   locale;
   defaultTimezone;
@@ -3284,13 +2884,6 @@ var I18nPluralPipe = class _I18nPluralPipe {
   constructor(_localization) {
     this._localization = _localization;
   }
-  /**
-   * @param value the number to be formatted
-   * @param pluralMap an object that mimics the ICU format, see
-   * https://unicode-org.github.io/icu/userguide/format_parse/messages/.
-   * @param locale a `string` defining the locale to use (uses the current {@link LOCALE_ID} by
-   * default).
-   */
   transform(value, pluralMap, locale) {
     if (value == null) return "";
     if (typeof pluralMap !== "object" || pluralMap === null) {
@@ -3319,11 +2912,6 @@ var I18nPluralPipe = class _I18nPluralPipe {
   }], null);
 })();
 var I18nSelectPipe = class _I18nSelectPipe {
-  /**
-   * @param value a string to be internationalized.
-   * @param mapping an object that indicates the text that should be displayed
-   * for different values of the provided `value`.
-   */
   transform(value, mapping) {
     if (value == null) return "";
     if (typeof mapping !== "object" || typeof value !== "string") {
@@ -3355,9 +2943,6 @@ var I18nSelectPipe = class _I18nSelectPipe {
   }], null, null);
 })();
 var JsonPipe = class _JsonPipe {
-  /**
-   * @param value A value of any type to convert into a JSON-format string.
-   */
   transform(value) {
     return JSON.stringify(value, null, 2);
   }
@@ -3438,10 +3023,8 @@ function defaultComparator(keyValueA, keyValueB) {
   const a = keyValueA.key;
   const b = keyValueB.key;
   if (a === b) return 0;
-  if (a === void 0) return 1;
-  if (b === void 0) return -1;
-  if (a === null) return 1;
-  if (b === null) return -1;
+  if (a == null) return 1;
+  if (b == null) return -1;
   if (typeof a == "string" && typeof b == "string") {
     return a < b ? -1 : 1;
   }
@@ -3498,22 +3081,6 @@ var PercentPipe = class _PercentPipe {
   constructor(_locale) {
     this._locale = _locale;
   }
-  /**
-   *
-   * @param value The number to be formatted as a percentage.
-   * @param digitsInfo Decimal representation options, specified by a string
-   * in the following format:<br>
-   * <code>{minIntegerDigits}.{minFractionDigits}-{maxFractionDigits}</code>.
-   *   - `minIntegerDigits`: The minimum number of integer digits before the decimal point.
-   * Default is `1`.
-   *   - `minFractionDigits`: The minimum number of digits after the decimal point.
-   * Default is `0`.
-   *   - `maxFractionDigits`: The maximum number of digits after the decimal point.
-   * Default is `0`.
-   * @param locale A locale code for the locale format rules to use.
-   * When not supplied, uses the value of `LOCALE_ID`, which is `en-US` by default.
-   * See [Setting your app locale](guide/i18n/locale-id).
-   */
   transform(value, digitsInfo, locale) {
     if (!isValue(value)) return null;
     locale ||= this._locale;
@@ -3558,7 +3125,7 @@ var CurrencyPipe = class _CurrencyPipe {
     if (!isValue(value)) return null;
     locale ||= this._locale;
     if (typeof display === "boolean") {
-      if ((typeof ngDevMode === "undefined" || ngDevMode) && console && console.warn) {
+      if (typeof ngDevMode === "undefined" || ngDevMode) {
         console.warn(`Warning: the currency pipe has been changed in Angular v5. The symbolDisplay option (third parameter) is now a string instead of a boolean. The accepted values are "code", "symbol" or "symbol-narrow".`);
       }
       display = display ? "symbol" : "code";
@@ -3615,20 +3182,18 @@ function strToNumber(value) {
     return Number(value);
   }
   if (typeof value !== "number") {
-    throw new Error(`${value} is not a number`);
+    throw new RuntimeError(2309, ngDevMode && `${value} is not a number`);
   }
   return value;
 }
 var SlicePipe = class _SlicePipe {
   transform(value, start, end) {
     if (value == null) return null;
-    if (!this.supports(value)) {
+    const supports = typeof value === "string" || Array.isArray(value);
+    if (!supports) {
       throw invalidPipeArgumentError(_SlicePipe, value);
     }
     return value.slice(start, end);
-  }
-  supports(obj) {
-    return typeof obj === "string" || Array.isArray(obj);
   }
   static ɵfac = function SlicePipe_Factory(__ngFactoryType__) {
     return new (__ngFactoryType__ || _SlicePipe)();
@@ -3669,6 +3234,106 @@ var CommonModule = class _CommonModule {
     }]
   }], null, null);
 })();
+
+// node_modules/@angular/common/fesm2022/_platform_navigation-chunk.mjs
+var PlatformNavigation = class _PlatformNavigation {
+  static ɵfac = function PlatformNavigation_Factory(__ngFactoryType__) {
+    return new (__ngFactoryType__ || _PlatformNavigation)();
+  };
+  static ɵprov = ɵɵdefineInjectable({
+    token: _PlatformNavigation,
+    factory: () => (() => window.navigation)(),
+    providedIn: "platform"
+  });
+};
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(PlatformNavigation, [{
+    type: Injectable,
+    args: [{
+      providedIn: "platform",
+      useFactory: () => window.navigation
+    }]
+  }], null, null);
+})();
+
+// node_modules/@angular/common/fesm2022/_xhr-chunk.mjs
+function parseCookieValue(cookieStr, name) {
+  name = encodeURIComponent(name);
+  for (const cookie of cookieStr.split(";")) {
+    const eqIndex = cookie.indexOf("=");
+    const [cookieName, cookieValue] = eqIndex == -1 ? [cookie, ""] : [cookie.slice(0, eqIndex), cookie.slice(eqIndex + 1)];
+    if (cookieName.trim() === name) {
+      return decodeURIComponent(cookieValue);
+    }
+  }
+  return null;
+}
+var XhrFactory = class {
+};
+
+// node_modules/@angular/common/fesm2022/common.mjs
+var NavigationAdapterForLocation = class _NavigationAdapterForLocation extends Location {
+  navigation = inject(PlatformNavigation);
+  destroyRef = inject(DestroyRef);
+  constructor() {
+    super(inject(LocationStrategy));
+    this.registerNavigationListeners();
+  }
+  registerNavigationListeners() {
+    const currentEntryChangeListener = () => {
+      this._notifyUrlChangeListeners(this.path(true), this.getState());
+    };
+    this.navigation.addEventListener("currententrychange", currentEntryChangeListener);
+    this.destroyRef.onDestroy(() => {
+      this.navigation.removeEventListener("currententrychange", currentEntryChangeListener);
+    });
+  }
+  getState() {
+    return this.navigation.currentEntry?.getState();
+  }
+  replaceState(path, query = "", state = null) {
+    const url = this.prepareExternalUrl(path + normalizeQueryParams(query));
+    this.navigation.navigate(url, {
+      state,
+      history: "replace"
+    });
+  }
+  go(path, query = "", state = null) {
+    const url = this.prepareExternalUrl(path + normalizeQueryParams(query));
+    this.navigation.navigate(url, {
+      state,
+      history: "push"
+    });
+  }
+  back() {
+    this.navigation.back();
+  }
+  forward() {
+    this.navigation.forward();
+  }
+  onUrlChange(fn) {
+    this._urlChangeListeners.push(fn);
+    return () => {
+      const fnIndex = this._urlChangeListeners.indexOf(fn);
+      this._urlChangeListeners.splice(fnIndex, 1);
+    };
+  }
+  static ɵfac = function NavigationAdapterForLocation_Factory(__ngFactoryType__) {
+    return new (__ngFactoryType__ || _NavigationAdapterForLocation)();
+  };
+  static ɵprov = ɵɵdefineInjectable({
+    token: _NavigationAdapterForLocation,
+    factory: _NavigationAdapterForLocation.ɵfac
+  });
+};
+(() => {
+  (typeof ngDevMode === "undefined" || ngDevMode) && setClassMetadata(NavigationAdapterForLocation, [{
+    type: Injectable
+  }], () => [], null);
+})();
+function registerLocaleData2(data, localeId, extraData) {
+  return registerLocaleData(data, localeId, extraData);
+}
 var PLATFORM_BROWSER_ID = "browser";
 var PLATFORM_SERVER_ID = "server";
 function isPlatformBrowser(platformId) {
@@ -3677,19 +3342,13 @@ function isPlatformBrowser(platformId) {
 function isPlatformServer(platformId) {
   return platformId === PLATFORM_SERVER_ID;
 }
-var VERSION = new Version("19.0.5");
+var VERSION = new Version("21.0.6");
 var ViewportScroller = class _ViewportScroller {
-  // De-sugared tree-shakable injection
-  // See #23917
-  /** @nocollapse */
-  static ɵprov = (
-    /** @pureOrBreakMyCode */
-    ɵɵdefineInjectable({
-      token: _ViewportScroller,
-      providedIn: "root",
-      factory: () => isPlatformBrowser(inject(PLATFORM_ID)) ? new BrowserViewportScroller(inject(DOCUMENT), window) : new NullViewportScroller()
-    })
-  );
+  static ɵprov = ɵɵdefineInjectable({
+    token: _ViewportScroller,
+    providedIn: "root",
+    factory: () => false ? new NullViewportScroller() : new BrowserViewportScroller(inject(DOCUMENT), window)
+  });
 };
 var BrowserViewportScroller = class {
   document;
@@ -3699,12 +3358,6 @@ var BrowserViewportScroller = class {
     this.document = document;
     this.window = window2;
   }
-  /**
-   * Configures the top offset used when scrolling to an anchor.
-   * @param offset A position in screen coordinates (a tuple with x and y values)
-   * or a function that returns the top offset position.
-   *
-   */
   setOffset(offset) {
     if (Array.isArray(offset)) {
       this.offset = () => offset;
@@ -3712,56 +3365,38 @@ var BrowserViewportScroller = class {
       this.offset = offset;
     }
   }
-  /**
-   * Retrieves the current scroll position.
-   * @returns The position in screen coordinates.
-   */
   getScrollPosition() {
     return [this.window.scrollX, this.window.scrollY];
   }
-  /**
-   * Sets the scroll position.
-   * @param position The new position in screen coordinates.
-   */
-  scrollToPosition(position) {
-    this.window.scrollTo(position[0], position[1]);
+  scrollToPosition(position, options) {
+    this.window.scrollTo(__spreadProps(__spreadValues({}, options), {
+      left: position[0],
+      top: position[1]
+    }));
   }
-  /**
-   * Scrolls to an element and attempts to focus the element.
-   *
-   * Note that the function name here is misleading in that the target string may be an ID for a
-   * non-anchor element.
-   *
-   * @param target The ID of an element or name of the anchor.
-   *
-   * @see https://html.spec.whatwg.org/#the-indicated-part-of-the-document
-   * @see https://html.spec.whatwg.org/#scroll-to-fragid
-   */
-  scrollToAnchor(target) {
+  scrollToAnchor(target, options) {
     const elSelected = findAnchorFromDocument(this.document, target);
     if (elSelected) {
-      this.scrollToElement(elSelected);
+      this.scrollToElement(elSelected, options);
       elSelected.focus();
     }
   }
-  /**
-   * Disables automatic scroll restoration provided by the browser.
-   */
   setHistoryScrollRestoration(scrollRestoration) {
-    this.window.history.scrollRestoration = scrollRestoration;
+    try {
+      this.window.history.scrollRestoration = scrollRestoration;
+    } catch {
+      console.warn(formatRuntimeError(2400, ngDevMode && "Failed to set `window.history.scrollRestoration`. This may occur when:\n• The script is running inside a sandboxed iframe\n• The window is partially navigated or inactive\n• The script is executed in an untrusted or special context (e.g., test runners, browser extensions, or content previews)\nScroll position may not be preserved across navigation."));
+    }
   }
-  /**
-   * Scrolls to an element using the native offset and the specified offset set on this scroller.
-   *
-   * The offset can be used when we know that there is a floating header and scrolling naively to an
-   * element (ex: `scrollIntoView`) leaves the element hidden behind the floating header.
-   */
-  scrollToElement(el) {
+  scrollToElement(el, options) {
     const rect = el.getBoundingClientRect();
     const left = rect.left + this.window.pageXOffset;
     const top = rect.top + this.window.pageYOffset;
     const offset = this.offset();
-    this.window.scrollTo(left - offset[0], top - offset[1]);
+    this.window.scrollTo(__spreadProps(__spreadValues({}, options), {
+      left: left - offset[0],
+      top: top - offset[1]
+    }));
   }
 };
 function findAnchorFromDocument(document, target) {
@@ -3786,34 +3421,17 @@ function findAnchorFromDocument(document, target) {
   return null;
 }
 var NullViewportScroller = class {
-  /**
-   * Empty implementation
-   */
   setOffset(offset) {
   }
-  /**
-   * Empty implementation
-   */
   getScrollPosition() {
     return [0, 0];
   }
-  /**
-   * Empty implementation
-   */
   scrollToPosition(position) {
   }
-  /**
-   * Empty implementation
-   */
   scrollToAnchor(anchor) {
   }
-  /**
-   * Empty implementation
-   */
   setHistoryScrollRestoration(scrollRestoration) {
   }
-};
-var XhrFactory = class {
 };
 var PLACEHOLDER_QUALITY = "20";
 function getUrl(src, win) {
@@ -3844,8 +3462,7 @@ function normalizeSrc(src) {
   return src.startsWith("/") ? src.slice(1) : src;
 }
 var noopImageLoader = (config) => config.src;
-var IMAGE_LOADER = new InjectionToken(ngDevMode ? "ImageLoader" : "", {
-  providedIn: "root",
+var IMAGE_LOADER = new InjectionToken(typeof ngDevMode !== "undefined" && ngDevMode ? "ImageLoader" : "", {
   factory: () => noopImageLoader
 });
 function createImageLoader(buildUrlFn, exampleUrls) {
@@ -4012,23 +3629,15 @@ function assertDevMode(checkName) {
   }
 }
 var LCPImageObserver = class _LCPImageObserver {
-  // Map of full image URLs -> original `ngSrc` values.
   images = /* @__PURE__ */ new Map();
-  window = null;
+  window = inject(DOCUMENT).defaultView;
   observer = null;
   constructor() {
-    const isBrowser = isPlatformBrowser(inject(PLATFORM_ID));
     assertDevMode("LCP checker");
-    const win = inject(DOCUMENT).defaultView;
-    if (isBrowser && typeof PerformanceObserver !== "undefined") {
-      this.window = win;
+    if (typeof PerformanceObserver !== "undefined") {
       this.observer = this.initPerformanceObserver();
     }
   }
-  /**
-   * Inits PerformanceObserver and subscribes to LCP events.
-   * Based on https://web.dev/lcp/#measure-lcp-in-javascript
-   */
   initPerformanceObserver() {
     const observer = new PerformanceObserver((entryList) => {
       const entries = entryList.getEntries();
@@ -4107,28 +3716,16 @@ function logModifiedWarning(ngSrc) {
   const directiveDetails = imgDirectiveDetails(ngSrc);
   console.warn(formatRuntimeError(2964, `${directiveDetails} this image is the Largest Contentful Paint (LCP) element and has had its "ngSrc" attribute modified. This can cause slower loading performance. It is recommended not to modify the "ngSrc" property on any image which could be the LCP element.`));
 }
-var INTERNAL_PRECONNECT_CHECK_BLOCKLIST = /* @__PURE__ */ new Set(["localhost", "127.0.0.1", "0.0.0.0"]);
-var PRECONNECT_CHECK_BLOCKLIST = new InjectionToken(ngDevMode ? "PRECONNECT_CHECK_BLOCKLIST" : "");
+var INTERNAL_PRECONNECT_CHECK_BLOCKLIST = /* @__PURE__ */ new Set(["localhost", "127.0.0.1", "0.0.0.0", "[::1]"]);
+var PRECONNECT_CHECK_BLOCKLIST = new InjectionToken(typeof ngDevMode !== "undefined" && ngDevMode ? "PRECONNECT_CHECK_BLOCKLIST" : "");
 var PreconnectLinkChecker = class _PreconnectLinkChecker {
   document = inject(DOCUMENT);
-  isServer = isPlatformServer(inject(PLATFORM_ID));
-  /**
-   * Set of <link rel="preconnect"> tags found on this page.
-   * The `null` value indicates that there was no DOM query operation performed.
-   */
   preconnectLinks = null;
-  /*
-   * Keep track of all already seen origin URLs to avoid repeating the same check.
-   */
   alreadySeen = /* @__PURE__ */ new Set();
-  window = null;
+  window = this.document.defaultView;
   blocklist = new Set(INTERNAL_PRECONNECT_CHECK_BLOCKLIST);
   constructor() {
     assertDevMode("preconnect link checker");
-    const win = this.document.defaultView;
-    if (typeof win !== "undefined") {
-      this.window = win;
-    }
     const blocklist = inject(PRECONNECT_CHECK_BLOCKLIST, {
       optional: true
     });
@@ -4145,15 +3742,8 @@ var PreconnectLinkChecker = class _PreconnectLinkChecker {
       this.blocklist.add(extractHostname(origins));
     }
   }
-  /**
-   * Checks that a preconnect resource hint exists in the head for the
-   * given src.
-   *
-   * @param rewrittenSrc src formatted with loader
-   * @param originalNgSrc ngSrc value
-   */
   assertPreconnect(rewrittenSrc, originalNgSrc) {
-    if (this.isServer) return;
+    if (false) return;
     const imgUrl = getUrl(rewrittenSrc, this.window);
     if (this.blocklist.has(imgUrl.hostname) || this.alreadySeen.has(imgUrl.origin)) return;
     this.alreadySeen.add(imgUrl.origin);
@@ -4165,9 +3755,8 @@ var PreconnectLinkChecker = class _PreconnectLinkChecker {
   }
   queryPreconnectLinks() {
     const preconnectUrls = /* @__PURE__ */ new Set();
-    const selector = "link[rel=preconnect]";
-    const links = Array.from(this.document.querySelectorAll(selector));
-    for (let link of links) {
+    const links = this.document.querySelectorAll("link[rel=preconnect]");
+    for (const link of links) {
       const url = getUrl(link.href, this.window);
       preconnectUrls.add(url.origin);
     }
@@ -4200,34 +3789,17 @@ function deepForEach(input, fn) {
   }
 }
 var DEFAULT_PRELOADED_IMAGES_LIMIT = 5;
-var PRELOADED_IMAGES = new InjectionToken("NG_OPTIMIZED_PRELOADED_IMAGES", {
-  providedIn: "root",
+var PRELOADED_IMAGES = new InjectionToken(typeof ngDevMode === "undefined" || ngDevMode ? "NG_OPTIMIZED_PRELOADED_IMAGES" : "", {
   factory: () => /* @__PURE__ */ new Set()
 });
 var PreloadLinkCreator = class _PreloadLinkCreator {
   preloadedImages = inject(PRELOADED_IMAGES);
   document = inject(DOCUMENT);
-  /**
-   * @description Add a preload `<link>` to the `<head>` of the `index.html` that is served from the
-   * server while using Angular Universal and SSR to kick off image loads for high priority images.
-   *
-   * The `sizes` (passed in from the user) and `srcset` (parsed and formatted from `ngSrcset`)
-   * properties used to set the corresponding attributes, `imagesizes` and `imagesrcset`
-   * respectively, on the preload `<link>` tag so that the correctly sized image is preloaded from
-   * the CDN.
-   *
-   * {@link https://web.dev/preload-responsive-images/#imagesrcset-and-imagesizes}
-   *
-   * @param renderer The `Renderer2` passed in from the directive
-   * @param src The original src of the image that is set on the `ngSrc` input.
-   * @param srcset The parsed and formatted srcset created from the `ngSrcset` input
-   * @param sizes The value of the `sizes` attribute passed in to the `<img>` tag
-   */
+  errorShown = false;
   createPreloadLinkTag(renderer, src, srcset, sizes) {
-    if (ngDevMode) {
-      if (this.preloadedImages.size >= DEFAULT_PRELOADED_IMAGES_LIMIT) {
-        throw new RuntimeError(2961, ngDevMode && `The \`NgOptimizedImage\` directive has detected that more than ${DEFAULT_PRELOADED_IMAGES_LIMIT} images were marked as priority. This might negatively affect an overall performance of the page. To fix this, remove the "priority" attribute from images with less priority.`);
-      }
+    if (ngDevMode && !this.errorShown && this.preloadedImages.size >= DEFAULT_PRELOADED_IMAGES_LIMIT) {
+      this.errorShown = true;
+      console.warn(formatRuntimeError(2961, `The \`NgOptimizedImage\` directive has detected that more than ${DEFAULT_PRELOADED_IMAGES_LIMIT} images were marked as priority. This might negatively affect an overall performance of the page. To fix this, remove the "priority" attribute from images with less priority.`));
     }
     if (this.preloadedImages.has(src)) {
       return;
@@ -4274,7 +3846,6 @@ var ASPECT_RATIO_TOLERANCE = 0.1;
 var OVERSIZED_IMAGE_TOLERANCE = 1e3;
 var FIXED_SRCSET_WIDTH_LIMIT = 1920;
 var FIXED_SRCSET_HEIGHT_LIMIT = 1080;
-var PLACEHOLDER_BLUR_AMOUNT = 15;
 var PLACEHOLDER_DIMENSION_LIMIT = 1e3;
 var DATA_URL_WARN_LIMIT = 4e3;
 var DATA_URL_ERROR_LIMIT = 1e4;
@@ -4287,100 +3858,34 @@ var NgOptimizedImage = class _NgOptimizedImage {
   renderer = inject(Renderer2);
   imgElement = inject(ElementRef).nativeElement;
   injector = inject(Injector);
-  isServer = isPlatformServer(inject(PLATFORM_ID));
-  preloadLinkCreator = inject(PreloadLinkCreator);
-  // a LCP image observer - should be injected only in the dev mode
-  lcpObserver = ngDevMode ? this.injector.get(LCPImageObserver) : null;
-  /**
-   * Calculate the rewritten `src` once and store it.
-   * This is needed to avoid repetitive calculations and make sure the directive cleanup in the
-   * `ngOnDestroy` does not rely on the `IMAGE_LOADER` logic (which in turn can rely on some other
-   * instance that might be already destroyed).
-   */
+  destroyRef = inject(DestroyRef);
+  lcpObserver;
   _renderedSrc = null;
-  /**
-   * Name of the source image.
-   * Image name will be processed by the image loader and the final URL will be applied as the `src`
-   * property of the image.
-   */
   ngSrc;
-  /**
-   * A comma separated list of width or density descriptors.
-   * The image name will be taken from `ngSrc` and combined with the list of width or density
-   * descriptors to generate the final `srcset` property of the image.
-   *
-   * Example:
-   * ```
-   * <img ngSrc="hello.jpg" ngSrcset="100w, 200w" />  =>
-   * <img src="path/hello.jpg" srcset="path/hello.jpg?w=100 100w, path/hello.jpg?w=200 200w" />
-   * ```
-   */
   ngSrcset;
-  /**
-   * The base `sizes` attribute passed through to the `<img>` element.
-   * Providing sizes causes the image to create an automatic responsive srcset.
-   */
   sizes;
-  /**
-   * For responsive images: the intrinsic width of the image in pixels.
-   * For fixed size images: the desired rendered width of the image in pixels.
-   */
   width;
-  /**
-   * For responsive images: the intrinsic height of the image in pixels.
-   * For fixed size images: the desired rendered height of the image in pixels.
-   */
   height;
-  /**
-   * The desired loading behavior (lazy, eager, or auto). Defaults to `lazy`,
-   * which is recommended for most images.
-   *
-   * Warning: Setting images as loading="eager" or loading="auto" marks them
-   * as non-priority images and can hurt loading performance. For images which
-   * may be the LCP element, use the `priority` attribute instead of `loading`.
-   */
+  decoding;
   loading;
-  /**
-   * Indicates whether this image should have a high priority.
-   */
   priority = false;
-  /**
-   * Data to pass through to custom loaders.
-   */
   loaderParams;
-  /**
-   * Disables automatic srcset generation for this image.
-   */
   disableOptimizedSrcset = false;
-  /**
-   * Sets the image to "fill mode", which eliminates the height/width requirement and adds
-   * styles such that the image fills its containing element.
-   */
   fill = false;
-  /**
-   * A URL or data URL for an image to be used as a placeholder while this image loads.
-   */
   placeholder;
-  /**
-   * Configuration object for placeholder settings. Options:
-   *   * blur: Setting this to false disables the automatic CSS blur.
-   */
   placeholderConfig;
-  /**
-   * Value of the `src` attribute if set on the host `<img>` element.
-   * This input is exclusively read to assert that `src` is not set in conflict
-   * with `ngSrc` and that images don't start to load until a lazy loading strategy is set.
-   * @internal
-   */
   src;
-  /**
-   * Value of the `srcset` attribute if set on the host `<img>` element.
-   * This input is exclusively read to assert that `srcset` is not set in conflict
-   * with `ngSrcset` and that images don't start to load until a lazy loading strategy is set.
-   * @internal
-   */
   srcset;
-  /** @nodoc */
+  constructor() {
+    if (ngDevMode) {
+      this.lcpObserver = this.injector.get(LCPImageObserver);
+      this.destroyRef.onDestroy(() => {
+        if (!this.priority && this._renderedSrc !== null) {
+          this.lcpObserver.unregisterImage(this._renderedSrc);
+        }
+      });
+    }
+  }
   ngOnInit() {
     performanceMarkFeature("NgOptimizedImage");
     if (ngDevMode) {
@@ -4395,7 +3900,7 @@ var NgOptimizedImage = class _NgOptimizedImage {
       assertNotBlobUrl(this);
       if (this.fill) {
         assertEmptyWidthAndHeight(this);
-        ngZone.runOutsideAngular(() => assertNonZeroRenderedHeight(this, this.imgElement, this.renderer));
+        ngZone.runOutsideAngular(() => assertNonZeroRenderedHeight(this, this.imgElement, this.renderer, this.destroyRef));
       } else {
         assertNonEmptyWidthAndHeight(this);
         if (this.height !== void 0) {
@@ -4404,9 +3909,10 @@ var NgOptimizedImage = class _NgOptimizedImage {
         if (this.width !== void 0) {
           assertGreaterThanZero(this, this.width, "width");
         }
-        ngZone.runOutsideAngular(() => assertNoImageDistortion(this, this.imgElement, this.renderer));
+        ngZone.runOutsideAngular(() => assertNoImageDistortion(this, this.imgElement, this.renderer, this.destroyRef));
       }
       assertValidLoadingInput(this);
+      assertValidDecodingInput(this);
       if (!this.ngSrcset) {
         assertNoComplexSizes(this);
       }
@@ -4414,16 +3920,13 @@ var NgOptimizedImage = class _NgOptimizedImage {
       assertNotMissingBuiltInLoader(this.ngSrc, this.imageLoader);
       assertNoNgSrcsetWithoutLoader(this, this.imageLoader);
       assertNoLoaderParamsWithoutLoader(this, this.imageLoader);
-      if (this.lcpObserver !== null) {
-        const ngZone2 = this.injector.get(NgZone);
-        ngZone2.runOutsideAngular(() => {
-          this.lcpObserver.registerImage(this.getRewrittenSrc(), this.ngSrc, this.priority);
-        });
-      }
+      ngZone.runOutsideAngular(() => {
+        this.lcpObserver.registerImage(this.getRewrittenSrc(), this.ngSrc, this.priority);
+      });
       if (this.priority) {
         const checker = this.injector.get(PreconnectLinkChecker);
         checker.assertPreconnect(this.getRewrittenSrc(), this.ngSrc);
-        if (!this.isServer) {
+        if (true) {
           const applicationRef = this.injector.get(ApplicationRef);
           assetPriorityCountBelowThreshold(applicationRef);
         }
@@ -4443,6 +3946,7 @@ var NgOptimizedImage = class _NgOptimizedImage {
     }
     this.setHostAttribute("loading", this.getLoadingBehavior());
     this.setHostAttribute("fetchpriority", this.getFetchPriority());
+    this.setHostAttribute("decoding", this.getDecoding());
     this.setHostAttribute("ng-img", "true");
     const rewrittenSrcset = this.updateSrcAndSrcset();
     if (this.sizes) {
@@ -4456,11 +3960,11 @@ var NgOptimizedImage = class _NgOptimizedImage {
         this.setHostAttribute("sizes", "auto, 100vw");
       }
     }
-    if (this.isServer && this.priority) {
-      this.preloadLinkCreator.createPreloadLinkTag(this.renderer, this.getRewrittenSrc(), rewrittenSrcset, this.sizes);
+    if (false) {
+      const preloadLinkCreator = this.injector.get(PreloadLinkCreator);
+      preloadLinkCreator.createPreloadLinkTag(this.renderer, this.getRewrittenSrc(), rewrittenSrcset, this.sizes);
     }
   }
-  /** @nodoc */
   ngOnChanges(changes) {
     if (ngDevMode) {
       assertNoPostInitInputChange(this, changes, ["ngSrcset", "width", "height", "priority", "fill", "loading", "sizes", "loaderParams", "disableOptimizedSrcset"]);
@@ -4468,15 +3972,17 @@ var NgOptimizedImage = class _NgOptimizedImage {
     if (changes["ngSrc"] && !changes["ngSrc"].isFirstChange()) {
       const oldSrc = this._renderedSrc;
       this.updateSrcAndSrcset(true);
-      const newSrc = this._renderedSrc;
-      if (this.lcpObserver !== null && oldSrc && newSrc && oldSrc !== newSrc) {
-        const ngZone = this.injector.get(NgZone);
-        ngZone.runOutsideAngular(() => {
-          this.lcpObserver?.updateImage(oldSrc, newSrc);
-        });
+      if (ngDevMode) {
+        const newSrc = this._renderedSrc;
+        if (oldSrc && newSrc && oldSrc !== newSrc) {
+          const ngZone = this.injector.get(NgZone);
+          ngZone.runOutsideAngular(() => {
+            this.lcpObserver.updateImage(oldSrc, newSrc);
+          });
+        }
       }
     }
-    if (ngDevMode && changes["placeholder"]?.currentValue && !this.isServer) {
+    if (ngDevMode && changes["placeholder"]?.currentValue && true && true) {
       assertPlaceholderDimensions(this, this.imgElement);
     }
   }
@@ -4495,6 +4001,12 @@ var NgOptimizedImage = class _NgOptimizedImage {
   }
   getFetchPriority() {
     return this.priority ? "high" : "auto";
+  }
+  getDecoding() {
+    if (this.priority) {
+      return "sync";
+    }
+    return this.decoding ?? "auto";
   }
   getRewrittenSrc() {
     if (!this._renderedSrc) {
@@ -4569,11 +4081,6 @@ var NgOptimizedImage = class _NgOptimizedImage {
     }
     return !this.disableOptimizedSrcset && !this.srcset && this.imageLoader !== noopImageLoader && !oversizedImage;
   }
-  /**
-   * Returns an image url formatted for use with the CSS background-image property. Expects one of:
-   * * A base64 encoded image, which is wrapped and passed through.
-   * * A boolean. If true, calls the image loader to generate a small placeholder url.
-   */
   generatePlaceholder(placeholderInput) {
     const {
       placeholderResolution
@@ -4589,10 +4096,6 @@ var NgOptimizedImage = class _NgOptimizedImage {
     }
     return null;
   }
-  /**
-   * Determines if blur should be applied, based on an optional boolean
-   * property `blur` within the optional configuration object `placeholderConfig`.
-   */
   shouldBlurPlaceholder(placeholderConfig) {
     if (!placeholderConfig || !placeholderConfig.hasOwnProperty("blur")) {
       return true;
@@ -4609,15 +4112,11 @@ var NgOptimizedImage = class _NgOptimizedImage {
     };
     const removeLoadListenerFn = this.renderer.listen(img, "load", callback);
     const removeErrorListenerFn = this.renderer.listen(img, "error", callback);
+    this.destroyRef.onDestroy(() => {
+      removeLoadListenerFn();
+      removeErrorListenerFn();
+    });
     callOnLoadIfImageIsLoaded(img, callback);
-  }
-  /** @nodoc */
-  ngOnDestroy() {
-    if (ngDevMode) {
-      if (!this.priority && this._renderedSrc !== null && this.lcpObserver !== null) {
-        this.lcpObserver.unregisterImage(this._renderedSrc);
-      }
-    }
   }
   setHostAttribute(name, value) {
     this.renderer.setAttribute(this.imgElement, name, value);
@@ -4640,6 +4139,7 @@ var NgOptimizedImage = class _NgOptimizedImage {
       sizes: "sizes",
       width: [2, "width", "width", numberAttribute],
       height: [2, "height", "height", numberAttribute],
+      decoding: "decoding",
       loading: "loading",
       priority: [2, "priority", "priority", booleanAttribute],
       loaderParams: "loaderParams",
@@ -4650,7 +4150,7 @@ var NgOptimizedImage = class _NgOptimizedImage {
       src: "src",
       srcset: "srcset"
     },
-    features: [ɵɵInputTransformsFeature, ɵɵNgOnChangesFeature]
+    features: [ɵɵNgOnChangesFeature]
   });
 };
 (() => {
@@ -4667,10 +4167,10 @@ var NgOptimizedImage = class _NgOptimizedImage {
         "[style.background-position]": 'placeholder ? "50% 50%" : null',
         "[style.background-repeat]": 'placeholder ? "no-repeat" : null',
         "[style.background-image]": "placeholder ? generatePlaceholder(placeholder) : null",
-        "[style.filter]": `placeholder && shouldBlurPlaceholder(placeholderConfig) ? "blur(${PLACEHOLDER_BLUR_AMOUNT}px)" : null`
+        "[style.filter]": 'placeholder && shouldBlurPlaceholder(placeholderConfig) ? "blur(15px)" : null'
       }
     }]
-  }], null, {
+  }], () => [], {
     ngSrc: [{
       type: Input,
       args: [{
@@ -4695,6 +4195,9 @@ var NgOptimizedImage = class _NgOptimizedImage {
       args: [{
         transform: numberAttribute
       }]
+    }],
+    decoding: [{
+      type: Input
     }],
     loading: [{
       type: Input
@@ -4856,7 +4359,7 @@ function assertGreaterThanZero(dir, inputValue, inputName) {
     throw new RuntimeError(2952, `${imgDirectiveDetails(dir.ngSrc)} \`${inputName}\` has an invalid value. To fix this, provide \`${inputName}\` as a number greater than 0.`);
   }
 }
-function assertNoImageDistortion(dir, img, renderer) {
+function assertNoImageDistortion(dir, img, renderer, destroyRef) {
   const callback = () => {
     removeLoadListenerFn();
     removeErrorListenerFn();
@@ -4911,6 +4414,10 @@ Note: Recommended intrinsic image size is calculated assuming a maximum DPR of $
     removeLoadListenerFn();
     removeErrorListenerFn();
   });
+  destroyRef.onDestroy(() => {
+    removeLoadListenerFn();
+    removeErrorListenerFn();
+  });
   callOnLoadIfImageIsLoaded(img, callback);
 }
 function assertNonEmptyWidthAndHeight(dir) {
@@ -4926,7 +4433,7 @@ function assertEmptyWidthAndHeight(dir) {
     throw new RuntimeError(2952, `${imgDirectiveDetails(dir.ngSrc)} the attributes \`height\` and/or \`width\` are present along with the \`fill\` attribute. Because \`fill\` mode causes an image to fill its containing element, the size attributes have no effect and should be removed.`);
   }
 }
-function assertNonZeroRenderedHeight(dir, img, renderer) {
+function assertNonZeroRenderedHeight(dir, img, renderer, destroyRef) {
   const callback = () => {
     removeLoadListenerFn();
     removeErrorListenerFn();
@@ -4940,6 +4447,10 @@ function assertNonZeroRenderedHeight(dir, img, renderer) {
     removeLoadListenerFn();
     removeErrorListenerFn();
   });
+  destroyRef.onDestroy(() => {
+    removeLoadListenerFn();
+    removeErrorListenerFn();
+  });
   callOnLoadIfImageIsLoaded(img, callback);
 }
 function assertValidLoadingInput(dir) {
@@ -4949,6 +4460,12 @@ function assertValidLoadingInput(dir) {
   const validInputs = ["auto", "eager", "lazy"];
   if (typeof dir.loading === "string" && !validInputs.includes(dir.loading)) {
     throw new RuntimeError(2952, `${imgDirectiveDetails(dir.ngSrc)} the \`loading\` attribute has an invalid value (\`${dir.loading}\`). To fix this, provide a valid value ("lazy", "eager", or "auto").`);
+  }
+}
+function assertValidDecodingInput(dir) {
+  const validInputs = ["sync", "async", "auto"];
+  if (typeof dir.decoding === "string" && !validInputs.includes(dir.decoding)) {
+    throw new RuntimeError(2952, `${imgDirectiveDetails(dir.ngSrc)} the \`decoding\` attribute has an invalid value (\`${dir.decoding}\`). To fix this, provide a valid value ("sync", "async", or "auto").`);
   }
 }
 function assertNotMissingBuiltInLoader(ngSrc, imageLoader) {
@@ -5021,8 +4538,6 @@ export {
   getDOM,
   setRootDomAdapter,
   DomAdapter,
-  PlatformNavigation,
-  DOCUMENT,
   PlatformLocation,
   LOCATION_INITIALIZED,
   BrowserPlatformLocation,
@@ -5030,8 +4545,8 @@ export {
   LocationStrategy,
   APP_BASE_HREF,
   PathLocationStrategy,
-  HashLocationStrategy,
   Location,
+  HashLocationStrategy,
   NumberFormatStyle,
   Plural,
   FormStyle,
@@ -5066,8 +4581,6 @@ export {
   formatNumber,
   NgLocalization,
   NgLocaleLocalization,
-  registerLocaleData2 as registerLocaleData,
-  parseCookieValue,
   NgClass,
   NgComponentOutlet,
   NgForOfContext,
@@ -5097,6 +4610,11 @@ export {
   CurrencyPipe,
   SlicePipe,
   CommonModule,
+  PlatformNavigation,
+  parseCookieValue,
+  XhrFactory,
+  NavigationAdapterForLocation,
+  registerLocaleData2 as registerLocaleData,
   PLATFORM_BROWSER_ID,
   PLATFORM_SERVER_ID,
   isPlatformBrowser,
@@ -5104,7 +4622,6 @@ export {
   VERSION,
   ViewportScroller,
   NullViewportScroller,
-  XhrFactory,
   IMAGE_LOADER,
   provideCloudflareLoader,
   provideCloudinaryLoader,
@@ -5114,13 +4631,4 @@ export {
   PRECONNECT_CHECK_BLOCKLIST,
   NgOptimizedImage
 };
-/*! Bundled license information:
-
-@angular/common/fesm2022/common.mjs:
-  (**
-   * @license Angular v19.0.5
-   * (c) 2010-2024 Google LLC. https://angular.io/
-   * License: MIT
-   *)
-*/
-//# sourceMappingURL=chunk-KD276FXN.js.map
+//# sourceMappingURL=chunk-GL4RVALN.js.map

@@ -12,7 +12,7 @@ h1 {
     flex-wrap: wrap;
     border: 1px solid white;
     border-radius: 20px 20px 20px 20px;
-    background-color: rgb(231, 230, 230);
+    background-color: rgb(184, 181, 181);
 }
 
 #balls {
@@ -51,7 +51,9 @@ h1 {
 button {
     font-size: 35px;
     padding: 40px;
-    border: solid 1px black;
+    background-color: black;
+    color: white;
+    border: solid 1px white;
     border-radius: 10px 10px 10px 10px;
     width: 250px;
     box-shadow: 1px 3px 3px rgba(0, 0, 0, 0.3);

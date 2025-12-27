@@ -6,7 +6,6 @@ import {
   CurrencyPipe,
   DATE_PIPE_DEFAULT_OPTIONS,
   DATE_PIPE_DEFAULT_TIMEZONE,
-  DOCUMENT,
   DatePipe,
   DecimalPipe,
   DomAdapter,
@@ -22,6 +21,7 @@ import {
   Location,
   LocationStrategy,
   LowerCasePipe,
+  NavigationAdapterForLocation,
   NgClass,
   NgComponentOutlet,
   NgForOf,
@@ -94,10 +94,11 @@ import {
   provideNetlifyLoader,
   registerLocaleData,
   setRootDomAdapter
-} from "./chunk-KD276FXN.js";
+} from "./chunk-GL4RVALN.js";
 import {
+  DOCUMENT,
   IMAGE_CONFIG
-} from "./chunk-GZKEX4RU.js";
+} from "./chunk-BZSXGGOF.js";
 export {
   APP_BASE_HREF,
   AsyncPipe,
@@ -145,6 +146,7 @@ export {
   PathLocationStrategy,
   PercentPipe,
   PlatformLocation,
+  PlatformNavigation,
   Plural,
   SlicePipe,
   TitleCasePipe,
@@ -188,13 +190,12 @@ export {
   provideNetlifyLoader,
   registerLocaleData,
   DomAdapter as ɵDomAdapter,
+  NavigationAdapterForLocation as ɵNavigationAdapterForLocation,
   NullViewportScroller as ɵNullViewportScroller,
   PLATFORM_BROWSER_ID as ɵPLATFORM_BROWSER_ID,
   PLATFORM_SERVER_ID as ɵPLATFORM_SERVER_ID,
-  PlatformNavigation as ɵPlatformNavigation,
   getDOM as ɵgetDOM,
   normalizeQueryParams as ɵnormalizeQueryParams,
   parseCookieValue as ɵparseCookieValue,
   setRootDomAdapter as ɵsetRootDomAdapter
 };
-//# sourceMappingURL=@angular_common.js.map
